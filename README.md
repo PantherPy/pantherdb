@@ -24,7 +24,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 
 - #### Delete a collection:
     ```python
-    db.collection('User').delete()
+    db.collection('User').drop()
     ```
 ### Create:
 - #### Insert document:

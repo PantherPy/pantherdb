@@ -263,7 +263,7 @@ class PantherCollection(PantherDB):
                 result += 1
         return result
 
-    def delete(self) -> None:
+    def drop(self) -> None:
         self._get_collection()
         self._drop_collection()
 
