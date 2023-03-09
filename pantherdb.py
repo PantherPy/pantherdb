@@ -9,9 +9,11 @@ class PantherDBException(Exception):
 
 class PantherDB:
     db_name: str = 'db.json'
+    return_dict: bool
     __content: dict
 
-    def __init__(self, db_name: str | None = None, collection_name: str | None = None):
+    def __init__(self, db_name: str | None = None, collection_name: str | None = None, return_dict: bool = False):
+        self.return_dict = return_dict
         if db_name:
             self.db_name = db_name
         if not os.path.exists(self.db_name):
@@ -48,14 +50,14 @@ class PantherDB:
             data = file.read()
             self.__content = json.loads(data) if data else {}
 
-    def collection(self, collection_name: str) -> PantherDBCollection:
-        return PantherDBCollection(db_name=self.db_name, collection_name=collection_name)
+    def collection(self, collection_name: str) -> PantherCollection:
+        return PantherCollection(db_name=self.db_name, collection_name=collection_name)
 
     def close(self):
         pass
 
 
-class PantherDBCollection(PantherDB):
+class PantherCollection(PantherDB):
     _collection_name: str
 
     def __init__(self, collection_name: str, db_name: str):
@@ -71,38 +73,51 @@ class PantherDBCollection(PantherDB):
         result = '\n'.join(f'    {k}: {type(v).__name__}' for k, v in documents[0].items())
         return f'{self.__class__.__name__}(\n    collection_name: {self._collection_name}\n\n{result}\n)'
 
+    def __check_is_panther_document(self) -> None:
+        if not hasattr(self, '_id'):
+            raise PantherDBException('You should call this method on PantherDocument instance.')
+
+    def __create_result(self, data: dict, /) -> PantherDocument | dict:
+        if self.return_dict:
+            return data
+        else:
+            return PantherDocument(collection_name=self._collection_name, db_name=self.db_name, **data)
+
     def _get_collection(self) -> list[dict]:
         """return documents"""
         self._refresh()
         return self.content.get(self._collection_name, [])
 
-    def first(self, **kwargs) -> dict | None:
+    def first(self, **kwargs) -> PantherDocument | dict | None:
         rows = self._get_collection()
         if not kwargs:
-            return rows[0]
+            if self.return_dict:
+                return rows[0]
+            else:
+                return self.__create_result(rows[0])
 
         for r in rows:
             for k, v in kwargs.items():
                 if r.get(k) != v:
                     break
             else:
-                return r
+                return self.__create_result(r)
 
-    def last(self, **kwargs) -> dict | None:
+    def last(self, **kwargs) -> PantherDocument | dict | None:
         rows = self._get_collection()
         rows.reverse()
 
         if not kwargs:
-            return rows[0]
+            return self.__create_result(rows[0])
 
         for r in rows:
             for k, v in kwargs.items():
                 if r.get(k) != v:
                     break
             else:
-                return r
+                return self.__create_result(r)
 
-    def find(self, **kwargs) -> list[dict]:
+    def find(self, **kwargs) -> list[PantherDocument | dict]:
         if not kwargs:
             return self.all()
 
@@ -112,19 +127,28 @@ class PantherDBCollection(PantherDB):
                 if r.get(k) != v:
                     break
             else:
-                result.append(r)
+                result.append(self.__create_result(r))
         return result
 
-    def all(self) -> list[dict]:
-        return self._get_collection()
+    def all(self) -> list[PantherDocument | dict]:
+        return [self.__create_result(r) for r in self._get_collection()]
     
-    def insert_one(self, **kwargs) -> str:
+    def insert_one(self, **kwargs) -> str | PantherDocument:
         rows = self._get_collection()
         kwargs['_id'] = len(rows) + 1
         rows.append(kwargs)
         self._write_collection(rows)
-        return kwargs['_id']
-    
+        return self.__create_result(kwargs)
+
+    def delete(self) -> None:
+        self.__check_is_panther_document()
+        documents = self._get_collection()
+        for d in documents:
+            if d.get('_id') == self._id:
+                documents.remove(d)
+                self._write_collection(documents)
+                break
+
     def delete_one(self, **kwargs) -> bool:
         rows = self._get_collection()
         if not kwargs:
@@ -176,7 +200,16 @@ class PantherDBCollection(PantherDB):
             rows.pop(i)
         self._write_collection(rows)
         return len(indexes)
-    
+
+    def update(self, **kwargs) -> None:
+        self.__check_is_panther_document()
+        documents = self._get_collection()
+        for d in documents:
+            if d.get('_id') == self._id:
+                for k, v in kwargs.items():
+                    d[k] = v
+                self._write_collection(documents)
+
     def update_one(self, condition: dict, **kwargs) -> bool:
         rows = self._get_collection()
         result = False
@@ -233,3 +266,53 @@ class PantherDBCollection(PantherDB):
     def drop(self) -> None:
         self._get_collection()
         self._drop_collection()
+
+
+class PantherDocument(PantherCollection):
+    __data: dict
+
+    def __init__(self, db_name: str, collection_name: str, **kwargs):
+        super().__init__(db_name=db_name, collection_name=collection_name)
+        self.__data = kwargs
+
+    def __str__(self) -> str:
+        items = ', '.join(f'id={v}' if k == '_id' else f'{k}={v}' for k, v in self.__data.items())
+        return f'{self.collection_name}({items})'
+
+    __repr__ = __str__
+
+    def __getattr__(self, item: str):
+        try:
+            return object.__getattribute__(self, '_PantherDocument__data')[item]
+        except KeyError:
+            raise PantherDBException(f'Invalid Collection Field: "{item}"')
+
+    def __setattr__(self, key, value):
+        if key not in ['_PantherDocument__data', '_PantherDB__content']:
+            try:
+                object.__getattribute__(self, key)
+            except AttributeError:
+                self.__data[key] = value
+                return
+
+        super().__setattr__(key, value)
+
+    @property
+    def id(self) -> int:
+        return self.__data['_id']
+
+    @property
+    def data(self) -> dict:
+        return self.__data
+
+    def save(self) -> None:
+        """Pop & Insert New Document"""
+        documents = self._get_collection()
+        for i, d in enumerate(documents):
+            if d['_id'] == self.id:
+                documents.pop(i)
+                documents.insert(i, self.__data)
+        super()._write_collection(rows=documents)
+
+    def json(self) -> str:
+        return json.dumps(self.__data).decode()
