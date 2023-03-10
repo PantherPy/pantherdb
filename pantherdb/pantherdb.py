@@ -51,7 +51,7 @@ class PantherDB:
             self.__content = json.loads(data) if data else {}
 
     def collection(self, collection_name: str) -> PantherCollection:
-        return PantherCollection(db_name=self.db_name, collection_name=collection_name)
+        return PantherCollection(db_name=self.db_name, collection_name=collection_name, return_dict=self.return_dict)
 
     def close(self):
         pass
@@ -60,8 +60,8 @@ class PantherDB:
 class PantherCollection(PantherDB):
     _collection_name: str
 
-    def __init__(self, collection_name: str, db_name: str):
-        super().__init__(db_name=db_name, collection_name=collection_name)
+    def __init__(self, db_name: str, collection_name: str, return_dict: bool):
+        super().__init__(db_name=db_name, collection_name=collection_name, return_dict=return_dict)
         self._collection_name = collection_name
 
     def __str__(self) -> str:
@@ -81,7 +81,8 @@ class PantherCollection(PantherDB):
         if self.return_dict:
             return data
         else:
-            return PantherDocument(collection_name=self._collection_name, db_name=self.db_name, **data)
+            return PantherDocument(
+                db_name=self.db_name, collection_name=self._collection_name, return_dict=self.return_dict, **data)
 
     def _get_collection(self) -> list[dict]:
         """return documents"""
@@ -132,7 +133,7 @@ class PantherCollection(PantherDB):
 
     def all(self) -> list[PantherDocument | dict]:
         return [self.__create_result(r) for r in self._get_collection()]
-    
+
     def insert_one(self, **kwargs) -> str | PantherDocument:
         rows = self._get_collection()
         kwargs['_id'] = len(rows) + 1
@@ -271,8 +272,8 @@ class PantherCollection(PantherDB):
 class PantherDocument(PantherCollection):
     __data: dict
 
-    def __init__(self, db_name: str, collection_name: str, **kwargs):
-        super().__init__(db_name=db_name, collection_name=collection_name)
+    def __init__(self, db_name: str, collection_name: str, return_dict: bool, **kwargs):
+        super().__init__(db_name=db_name, collection_name=collection_name, return_dict=return_dict)
         self.__data = kwargs
 
     def __str__(self) -> str:
