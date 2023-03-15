@@ -6,15 +6,22 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 - Document Oriented
 - Easy to use
 - Written in pure Python +3.11 based on standard type hints
-- 85% Test coverage
+- Handle Database Encryption
 
 
 ## Usage
 
 ### Database:
-- #### Create database:
+- #### Create a database:
     ```python
-    db: PantherDB = PantherDB('database.json')
+    db: PantherDB = PantherDB('database.pantherdb')
+    ```
+  
+- #### Create an encrypted database:
+    ```python
+    from cryptography.fernet import Fernet
+    key = Fernet.generate_key()  # Should be static (You should not generate new key on every run)
+    db: PantherDB = PantherDB('database.pantherdb', secret_key=key)
     ```
 
 - #### Access to a collection:

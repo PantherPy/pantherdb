@@ -31,5 +31,6 @@ setup(
     ],
     install_requires=[
         'orjson>=3.8.6',
+        'cryptography>=39.0.2',
     ],
 )
