@@ -132,27 +132,13 @@ class PantherCollection(PantherDB):
         self._refresh()
         return self.content.get(self.collection_name, [])
 
-    def first(self, **kwargs) -> PantherDocument | dict | None:
+    def find_one(self, **kwargs) -> PantherDocument | dict | None:
         documents = self._get_collection()
         if not kwargs:
             if self.return_dict:
                 return documents[0]
             else:
                 return self.__create_result(documents[0])
-
-        for d in documents:
-            for k, v in kwargs.items():
-                if d.get(k) != v:
-                    break
-            else:
-                return self.__create_result(d)
-
-    def last(self, **kwargs) -> PantherDocument | dict | None:
-        documents = self._get_collection()
-        documents.reverse()
-
-        if not kwargs:
-            return self.__create_result(documents[0])
 
         for d in documents:
             for k, v in kwargs.items():
@@ -180,7 +166,7 @@ class PantherCollection(PantherDB):
         else:
             return [self.__create_result(r) for r in self._get_collection()]
 
-    def insert_one(self, **kwargs) -> str | PantherDocument:
+    def insert_one(self, **kwargs) -> PantherDocument | dict:
         documents = self._get_collection()
         kwargs['_id'] = len(documents) + 1
         documents.append(kwargs)

@@ -42,20 +42,11 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 ### Get:
 - #### Find first document:
     ```python
-    user: PantherDocument = db.collection('User').first(first_name='Ali', last_name='Rn')
+    user: PantherDocument = db.collection('User').find_one(first_name='Ali', last_name='Rn')
     ```
     or
     ```python
-    user: PantherDocument = db.collection('User').first()
-    ```
-
-- #### Find last document:
-    ```python
-    user: PantherDocument = db.collection('User').last(last_name='Rn')
-    ```
-    or
-    ```python
-    user: PantherDocument = db.collection('User').last()
+    user: PantherDocument = db.collection('User').find_one()
     ```
 
 - #### Find documents:
@@ -108,3 +99,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
   ```python
   deleted_count: int = db.collection('User').delete_many(last_name='Rn')
   ```
+  
+## TODO:
+[x] Add Encryption
+[ ] Add B+ tree
