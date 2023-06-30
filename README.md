@@ -1,6 +1,6 @@
 ## Introduction
 
-PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> database that you can use it in your projects.
+PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> database that you can use in your projects.
 
 ### Features:
 - Document Oriented
@@ -14,14 +14,14 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 ### Database:
 - #### Create a database:
     ```python
-    db: PantherDB = PantherDB('database.pantherdb')
+    db: PantherDB = PantherDB('database.pdb')
     ```
   
 - #### Create an encrypted database:
     ```python
     from cryptography.fernet import Fernet
     key = Fernet.generate_key()  # Should be static (You should not generate new key on every run)
-    db: PantherDB = PantherDB('database.pantherdb', secret_key=key)
+    db: PantherDB = PantherDB('database.pdb', secret_key=key)
     ```
 
 - #### Access to a collection:

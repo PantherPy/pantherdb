@@ -9,7 +9,7 @@ class PantherDBException(Exception):
 
 
 class PantherDB:
-    db_name: str = 'database.pantherdb'
+    db_name: str = 'database.pdb'
     __secret_key: bytes | None
     __fernet: Fernet | None
     __return_dict: bool

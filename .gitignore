@@ -1,6 +1,6 @@
 .venv/
 .idea/
 __pycache__/
-*.pantherdb
+*.pdb
 dist/
 pantherdb.egg-info/
