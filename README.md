@@ -5,7 +5,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 ### Features:
 - Document Oriented
 - Easy to use
-- Written in pure Python +3.11 based on standard type hints
+- Written in pure Python +3.8 based on standard type hints
 - Handle Database Encryption
 
 
