@@ -15,7 +15,7 @@ DESCRIPTION = open('README.md').read()
 setup(
     name='pantherdb',
     version=VERSION,
-    python_requires='>=3.10',
+    python_requires='>=3.8',
     author='Ali RajabNezhad',
     author_email='alirn76@yahoo.com',
     url='https://github.com/alirn76/pantherdb',
@@ -27,11 +27,13 @@ setup(
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
     ],
     install_requires=[
-        'orjson~=3.8',
+        'orjson~=3.9',
         'cryptography~=39.0',
     ],
 )

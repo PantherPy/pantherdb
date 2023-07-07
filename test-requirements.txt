@@ -1,2 +1,3 @@
 Faker~=18.11
 orjson~=3.8
+cryptography~=39.0
