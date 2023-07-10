@@ -31,9 +31,10 @@ setup(
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
     ],
     install_requires=[
-        'orjson~=3.9',
+        'orjson~=3.9.2',
         'cryptography~=39.0',
     ],
 )
