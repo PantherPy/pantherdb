@@ -1,5 +1,6 @@
-.venv/
+.venv*
 .idea/
+build/
 __pycache__/
 *.pdb
 dist/

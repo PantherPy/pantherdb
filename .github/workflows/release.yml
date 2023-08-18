@@ -22,8 +22,11 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - name: Install Test Requirements
-        run: python -m pip install --upgrade -r test-requirements.txt
+      - name: Install PantherDB
+        run: python -m pip install .
+
+      - name: Install Faker
+        run: python -m pip install Faker
 
       - name: Run Tests
         run: python -m unittest tests/test_*.py

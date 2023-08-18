@@ -28,6 +28,7 @@ class TestNormalPantherDB(TestCase):
             collection.insert_one(first_name=f'{f.first_name()}{i}', last_name=f'{f.last_name()}{i}')
         return _count
 
+    # Create DB
     def test_creation_of_db(self):
         self.assertTrue(os.path.exists(self.db_name))
         self.assertTrue(os.path.isfile(self.db_name))
@@ -54,11 +55,13 @@ class TestNormalPantherDB(TestCase):
         self.assertEqual(collection.content, {})
         self.assertEqual(collection.secret_key, None)
 
+    # Drop
     def test_drop_collection(self):
         collection = self.db.collection(f.word())
         collection.drop()
         self.assertEqual(collection.content, {})
 
+    # Insert
     def test_insert_one(self):
         collection = self.db.collection(f.word())
         first_name = f.first_name()
@@ -79,6 +82,7 @@ class TestNormalPantherDB(TestCase):
         # obj will overwrite after every insert in loop, and we check the last obj
         self.assertEqual(obj.id, _count)
 
+    # Find One
     def test_find_one_first(self):
         collection = self.db.collection(f.word())
         first_name = f.first_name()
@@ -125,6 +129,7 @@ class TestNormalPantherDB(TestCase):
         obj = collection.find_one(first_name=first_name, last_name=last_name)
         self.assertIsNone(obj)
 
+    # Find
     def test_find_response_type(self):
         collection = self.db.collection(f.word())
         first_name = f.first_name()
@@ -215,6 +220,7 @@ class TestNormalPantherDB(TestCase):
 
         self.assertEqual(specific_count, _count_2)
 
+    # Count
     def test_count_all(self):
         collection = self.db.collection(f.word())
 
@@ -243,6 +249,7 @@ class TestNormalPantherDB(TestCase):
         self.assertEqual(count_specific, _count_2)
         self.assertEqual(count_specific, len(collection.find(first_name=first_name)))
 
+    # Delete Self
     def test_delete(self):
         collection = self.db.collection(f.word())
 
@@ -267,6 +274,7 @@ class TestNormalPantherDB(TestCase):
         objs_count = collection.count()
         self.assertEqual(objs_count, _count)
 
+    # Delete One
     def test_delete_one(self):
         collection = self.db.collection(f.word())
 
@@ -327,6 +335,7 @@ class TestNormalPantherDB(TestCase):
         undeleted_count = collection.count(first_name=first_name)
         self.assertEqual(undeleted_count, _count_2 - 1)
 
+    # Delete Many
     def test_delete_many(self):
         collection = self.db.collection(f.word())
 
@@ -363,6 +372,7 @@ class TestNormalPantherDB(TestCase):
         objs_count = collection.count()
         self.assertEqual(objs_count, _count)
 
+    # Update Self
     def test_update(self):
         collection = self.db.collection(f.word())
 
@@ -387,6 +397,7 @@ class TestNormalPantherDB(TestCase):
         obj = collection.find_one(first_name=new_name)
         self.assertEqual(obj.first_name, new_name)
 
+    # Update One
     def test_update_one_single_document(self):
         collection = self.db.collection(f.word())
 
@@ -433,6 +444,7 @@ class TestNormalPantherDB(TestCase):
         obj = collection.find_one(first_name=new_name)
         self.assertIsNone(obj)
 
+    # Update Many
     def test_update_many(self):
         collection = self.db.collection(f.word())
 
@@ -462,6 +474,7 @@ class TestNormalPantherDB(TestCase):
         objs_count = collection.count()
         self.assertEqual(objs_count, _count_1 + _count_2)
 
+    # Fields
     def test_document_fields(self):
         collection = self.db.collection(f.word())
         first_name = f.first_name()
@@ -475,6 +488,7 @@ class TestNormalPantherDB(TestCase):
 
         self.assertEqual(set(obj.data.keys()), {'first_name', 'last_name', '_id'})
 
+    # Save
     def test_document_save_method(self):
         collection = self.db.collection(f.word())
 
@@ -503,6 +517,7 @@ class TestNormalPantherDB(TestCase):
         obj = collection.find_one(first_name=new_name)
         self.assertEqual(obj.first_name, new_name)
 
+    # Json
     def test_document_json_method(self):
         collection = self.db.collection(f.word())
         first_name = f.first_name()
