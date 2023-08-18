@@ -1,16 +1,16 @@
-import os
 import re
 
 from setuptools import setup
 
 
 def pantherdb_version() -> str:
-    with open(os.path.join('pantherdb/__init__.py')) as f:
+    with open('pantherdb/__init__.py') as f:
         return re.search("__version__ = ['\"]([^'\"]+)['\"]", f.read()).group(1)
 
 
 VERSION = pantherdb_version()
-DESCRIPTION = open('README.md').read()
+with open('README.md') as file:
+    DESCRIPTION = file.read()
 
 setup(
     name='pantherdb',

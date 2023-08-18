@@ -1,10 +1,12 @@
-import os
-import orjson as json
 
-from uuid import uuid4
-from faker import Faker
+from pathlib import Path
 from unittest import TestCase
-from pantherdb import PantherDB, PantherCollection, PantherDocument
+from uuid import uuid4
+
+import orjson as json
+from faker import Faker
+
+from pantherdb import PantherCollection, PantherDB, PantherDocument
 
 f = Faker()
 
@@ -19,7 +21,7 @@ class TestNormalPantherDB(TestCase):
 
     @classmethod
     def tearDown(cls):
-        os.remove(cls.db_name)
+        Path(cls.db_name).unlink()
 
     @classmethod
     def create_junk_document(cls, collection) -> int:
@@ -30,8 +32,8 @@ class TestNormalPantherDB(TestCase):
 
     # Create DB
     def test_creation_of_db(self):
-        self.assertTrue(os.path.exists(self.db_name))
-        self.assertTrue(os.path.isfile(self.db_name))
+        self.assertTrue(Path(self.db_name).exists())
+        self.assertTrue(Path(self.db_name).is_file())
         self.assertEqual(self.db.db_name, self.db_name)
 
     def test_creation_of_db_without_extension(self):
@@ -39,11 +41,11 @@ class TestNormalPantherDB(TestCase):
         db = PantherDB(db_name=db_name)
         final_db_name = f'{db_name}.pdb'
 
-        self.assertTrue(os.path.exists(final_db_name))
-        self.assertTrue(os.path.isfile(final_db_name))
+        self.assertTrue(Path(final_db_name).exists())
+        self.assertTrue(Path(final_db_name).is_file())
         self.assertEqual(db.db_name, final_db_name)
 
-        os.remove(final_db_name)
+        Path(final_db_name).unlink()
 
     def test_creation_of_collection(self):
         collection_name = f.word()
@@ -492,9 +494,6 @@ class TestNormalPantherDB(TestCase):
     def test_document_save_method(self):
         collection = self.db.collection(f.word())
 
-        # Add others
-        # _count = self.create_junk_document(collection)
-
         # Insert with specific name
         first_name = f.first_name()
         collection.insert_one(first_name=first_name, last_name=f.last_name())
@@ -537,7 +536,5 @@ class TestNormalPantherDB(TestCase):
         self.assertEqual(obj.json(), json.dumps(_json).decode())
 
 
-# TODO: Test whole scenario with
-#   - secret_key
-#   - return_dict
+# TODO: Test whole scenario with -> secret_key, return_dict
 # TODO: Test where exceptions happen

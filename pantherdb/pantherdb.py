@@ -1,5 +1,7 @@
 from __future__ import annotations
-import os.path
+
+from pathlib import Path
+
 import orjson as json
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -15,7 +17,13 @@ class PantherDB:
     __return_dict: bool
     __content: dict
 
-    def __init__(self, db_name: str | None = None, return_dict: bool = False, secret_key: bytes | None = None):
+    def __init__(
+            self,
+            *,
+            db_name: str | None = None,
+            return_dict: bool = False,
+            secret_key: bytes | None = None,
+    ):
         self.__return_dict = return_dict
         self.__secret_key = secret_key
         self.__fernet = Fernet(self.__secret_key) if self.__secret_key else None
@@ -25,8 +33,7 @@ class PantherDB:
             if not db_name.endswith('pdb'):
                 db_name = f'{db_name}.pdb'
             self.db_name = db_name
-        if not os.path.exists(self.db_name):
-            open(self.db_name, 'w').close()
+        Path(self.db_name).touch(exist_ok=True)
 
     def __str__(self) -> str:
         self._refresh()
@@ -79,7 +86,7 @@ class PantherDB:
             db_name=self.db_name,
             collection_name=collection_name,
             return_dict=self.return_dict,
-            secret_key=self.secret_key
+            secret_key=self.secret_key,
         )
 
     def close(self):
@@ -89,16 +96,21 @@ class PantherDB:
 class PantherCollection(PantherDB):
     __collection_name: str
 
-    def __init__(self, db_name: str, collection_name: str, return_dict: bool, secret_key: bytes):
+    def __init__(
+            self,
+            *,
+            db_name: str,
+            collection_name: str,
+            return_dict: bool,
+            secret_key: bytes,
+    ):
         super().__init__(db_name=db_name, return_dict=return_dict, secret_key=secret_key)
         self.__collection_name = collection_name
 
     def __str__(self) -> str:
         self._refresh()
 
-        if self.collection_name not in self.content:
-            result = ''
-        elif documents := self.content[self.collection_name]:
+        if self.collection_name not in self.content or (documents := self.content[self.collection_name]):
             result = ''
         else:
             result = '\n'.join(f'    {k}: {type(v).__name__}' for k, v in documents[0].items())
@@ -122,7 +134,7 @@ class PantherCollection(PantherDB):
                 collection_name=self.collection_name,
                 return_dict=self.return_dict,
                 secret_key=self.secret_key,
-                **data
+                **data,
             )
 
     def _write_collection(self, documents: list) -> None:
@@ -136,7 +148,7 @@ class PantherCollection(PantherDB):
         self._write()
 
     def _get_collection(self) -> list[dict]:
-        """return documents"""
+        """Return documents"""
         self._refresh()
         return self.content.get(self.collection_name, [])
 
@@ -185,7 +197,7 @@ class PantherCollection(PantherDB):
         self.__check_is_panther_document()
         documents = self._get_collection()
         for d in documents:
-            if d.get('_id') == self._id:  # NOQA: Unresolved References
+            if d.get('_id') == self._id:  # noqa: Unresolved References
                 documents.remove(d)
                 self._write_collection(documents)
                 break
@@ -246,7 +258,7 @@ class PantherCollection(PantherDB):
         self.__check_is_panther_document()
         documents = self._get_collection()
         for d in documents:
-            if d.get('_id') == self._id:  # NOQA: Unresolved References
+            if d.get('_id') == self._id:  # noqa: Unresolved References
                 for k, v in kwargs.items():
                     d[k] = v
                     setattr(self, k, v)
@@ -312,13 +324,21 @@ class PantherCollection(PantherDB):
 class PantherDocument(PantherCollection):
     __data: dict
 
-    def __init__(self, db_name: str, collection_name: str, return_dict: bool, secret_key: bytes, **kwargs):
+    def __init__(
+            self,
+            *,
+            db_name: str,
+            collection_name: str,
+            return_dict: bool,
+            secret_key: bytes,
+            **kwargs,
+    ):
         self.__data = kwargs
         super().__init__(
             db_name=db_name,
             collection_name=collection_name,
             return_dict=return_dict,
-            secret_key=secret_key
+            secret_key=secret_key,
         )
 
     def __str__(self) -> str:
@@ -341,7 +361,7 @@ class PantherDocument(PantherCollection):
             '_PantherDB__content',
             '_PantherDB__fernet',
             '_PantherCollection__collection_name',
-            '_PantherDocument__data'
+            '_PantherDocument__data',
         ]:
             try:
                 object.__getattribute__(self, key)
