@@ -1,3 +1,6 @@
+
+[![PyPI](https://img.shields.io/pypi/v/pantherdb?label=PyPI)](https://pypi.org/project/pantherdb/) [![PyVersion](https://img.shields.io/pypi/pyversions/pantherdb.svg)](https://pypi.org/project/pantherdb/) [![Downloads](https://static.pepy.tech/badge/pantherdb/month)](https://pepy.tech/project/pantherdb) [![license](https://img.shields.io/github/license/alirn76/pantherdb.svg)](https://github.com/alirn76/pantherdb/blob/main/LICENSE)
+
 ## Introduction
 
 PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> database that you can use in your projects.
@@ -51,7 +54,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 
 - #### Find documents:
     ```python
-    user: PantherDocument = db.collection('User').find(last_name='Rn')
+    users: list[PantherDocument] = db.collection('User').find(last_name='Rn')
     ```
 
 - #### All documents:
@@ -101,5 +104,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
   ```
   
 ## TODO:
-[x] Add Encryption
-[ ] Add B+ tree
+- [x] Add encryption
+- [ ] Complete tests TODO
+- [ ] Add B+ tree
+- [ ] Find better encryption solution
