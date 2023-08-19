@@ -19,8 +19,8 @@ class PantherDB:
 
     def __init__(
             self,
-            *,
             db_name: str | None = None,
+            *,
             return_dict: bool = False,
             secret_key: bytes | None = None,
     ):
@@ -98,8 +98,8 @@ class PantherCollection(PantherDB):
 
     def __init__(
             self,
-            *,
             db_name: str,
+            *,
             collection_name: str,
             return_dict: bool,
             secret_key: bytes,
@@ -326,8 +326,8 @@ class PantherDocument(PantherCollection):
 
     def __init__(
             self,
-            *,
             db_name: str,
+            *,
             collection_name: str,
             return_dict: bool,
             secret_key: bytes,
