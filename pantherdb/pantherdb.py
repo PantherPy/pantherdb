@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import ClassVar
+from typing import ClassVar, Iterator
 
 import orjson as json
 from cryptography.fernet import Fernet, InvalidToken
@@ -146,14 +146,14 @@ class PantherCollection(PantherDB):
     def __create_result(self, data: dict, /) -> PantherDocument | dict:
         if self.return_dict:
             return data
-        else:
-            return PantherDocument(
-                db_name=self.db_name,
-                collection_name=self.collection_name,
-                return_dict=self.return_dict,
-                secret_key=self.secret_key,
-                **data,
-            )
+
+        return PantherDocument(
+            db_name=self.db_name,
+            collection_name=self.collection_name,
+            return_dict=self.return_dict,
+            secret_key=self.secret_key,
+            **data,
+        )
 
     def _write_collection(self, documents: list) -> None:
         self.content[self.collection_name] = documents
@@ -170,6 +170,19 @@ class PantherCollection(PantherDB):
         self._refresh()
         return self.content.get(self.collection_name, [])
 
+    def _find(self, _documents: list, /, **kwargs) -> Iterator[tuple[int, PantherDocument | dict]]:
+        found = False
+        for index, document in enumerate(_documents):
+            for k, v in kwargs.items():
+                if document.get(k) != v:
+                    break
+            else:
+                found = True
+                yield index, self.__create_result(document)
+
+        if not found:
+            yield None, None
+
     def find_one(self, **kwargs) -> PantherDocument | dict | None:
         documents = self._get_collection()
 
@@ -178,38 +191,41 @@ class PantherCollection(PantherDB):
             return None
 
         if not kwargs:
-            if self.return_dict:
-                return documents[0]
-            else:
-                return self.__create_result(documents[0])
+            return self.__create_result(documents[0])
 
-        for d in documents:
-            for k, v in kwargs.items():
-                if d.get(k) != v:
-                    break
-            else:
-                return self.__create_result(d)
+        for _, d in self._find(documents, **kwargs):
+            # Return the first document
+            return d
 
     def find(self, **kwargs) -> list[PantherDocument | dict]:
+        documents = self._get_collection()
+
+        # Empty Collection
+        if not documents:
+            return []
+
         if not kwargs:
             return self.all()
 
-        result = list()
-        for r in self._get_collection():
-            for k, v in kwargs.items():
-                if r.get(k) != v:
-                    break
-            else:
-                result.append(self.__create_result(r))
-        return result
+        return [d for _, d in self._find(documents, **kwargs) if d is not None]
 
     def first(self, **kwargs) -> PantherDocument | dict | None:
         return self.find_one(**kwargs)
 
     def last(self, **kwargs) -> PantherDocument | dict | None:
-        if result := self.find(**kwargs):
-            return result[-1]
-        return None
+        documents = self._get_collection()
+        documents.reverse()
+
+        # Empty Collection
+        if not documents:
+            return None
+
+        if not kwargs:
+            return self.__create_result(documents[0])
+
+        for _, d in self._find(documents, **kwargs):
+            # Return the first one
+            return d
 
     def all(self) -> list[PantherDocument | dict]:
         if self.return_dict:
@@ -235,49 +251,35 @@ class PantherCollection(PantherDB):
 
     def delete_one(self, **kwargs) -> bool:
         documents = self._get_collection()
+
+        # Empty Collection
+        if not documents:
+            return False
+
         if not kwargs:
             return False
 
-        index = 0
-        found = False
-        for d in documents:
-            for k, v in kwargs.items():
-                if d.get(k) != v:
-                    break
-            else:
-                found = True
-                break
-            index += 1
+        for i, _ in self._find(documents, **kwargs):
+            if i is None:
+                # Didn't find any match
+                return False
 
-        # Didn't find any match
-        if not found:
-            return False
-
-        # Delete Matched One
-        documents.pop(index)
-        self._write_collection(documents)
-        return True
+            # Delete matched one and return
+            documents.pop(i)
+            self._write_collection(documents)
+            return True
 
     def delete_many(self, **kwargs) -> int:
         documents = self._get_collection()
+
+        # Empty Collection
+        if not documents:
+            return 0
+
         if not kwargs:
             return 0
 
-        indexes = list()
-        index = 0
-        found = False
-        for d in documents:
-            for k, v in kwargs.items():
-                if d.get(k) != v:
-                    break
-            else:
-                indexes.append(index)
-                found = True
-            index += 1
-
-        # Didn't find any match
-        if not found:
-            return 0
+        indexes = [i for i, _ in self._find(documents, **kwargs) if i is not None]
 
         # Delete Matched Indexes
         for i in indexes[::-1]:
@@ -339,14 +341,7 @@ class PantherCollection(PantherDB):
         if not kwargs:
             return len(documents)
 
-        result = 0
-        for d in documents:
-            for k, v in kwargs.items():
-                if d.get(k) != v:
-                    break
-            else:
-                result += 1
-        return result
+        return len(list(self._find(documents, **kwargs)))
 
     def drop(self) -> None:
         self._drop_collection()
