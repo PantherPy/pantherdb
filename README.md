@@ -10,7 +10,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 - Easy to use
 - Written in pure Python +3.8 based on standard type hints
 - Handle Database Encryption
-
+- Singleton connection per `db_name`
 
 ## Usage
 
@@ -43,7 +43,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```
 
 ### Get:
-- #### Find first document:
+- #### Find one document:
     ```python
     user: PantherDocument = db.collection('User').find_one(first_name='Ali', last_name='Rn')
     ```
@@ -51,7 +51,25 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```python
     user: PantherDocument = db.collection('User').find_one()
     ```
-
+  
+- #### Find first document (alias of `find_one()`):
+    ```python
+    user: PantherDocument = db.collection('User').first(first_name='Ali', last_name='Rn')
+    ```
+    or
+    ```python
+    user: PantherDocument = db.collection('User').first()
+    ```
+  
+- #### Find last document:
+    ```python
+    user: PantherDocument = db.collection('User').last(first_name='Ali', last_name='Rn')
+    ```
+    or
+    ```python
+    user: PantherDocument = db.collection('User').lasst()
+    ```
+  
 - #### Find documents:
     ```python
     users: list[PantherDocument] = db.collection('User').find(last_name='Rn')

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import orjson as json
 from cryptography.fernet import Fernet, InvalidToken
@@ -11,11 +12,28 @@ class PantherDBException(Exception):
 
 
 class PantherDB:
+    _instances: ClassVar[dict] = {}
     db_name: str = 'database.pdb'
     __secret_key: bytes | None
     __fernet: Fernet | None
     __return_dict: bool
     __content: dict
+
+    def __new__(cls, *args, **kwargs):
+        if cls.__name__ != 'PantherDB':
+            return super().__new__(cls)
+
+        if args:
+            db_name = args[0]
+        elif 'db_name' in kwargs:
+            db_name = kwargs['db_name']
+        else:
+            db_name = cls.db_name
+
+        db_name = db_name.removesuffix('.pdb')
+        if db_name not in cls._instances:
+            cls._instances[db_name] = super().__new__(cls)
+        return cls._instances[db_name]
 
     def __init__(
             self,
@@ -154,6 +172,11 @@ class PantherCollection(PantherDB):
 
     def find_one(self, **kwargs) -> PantherDocument | dict | None:
         documents = self._get_collection()
+
+        # Empty Collection
+        if not documents:
+            return None
+
         if not kwargs:
             if self.return_dict:
                 return documents[0]
@@ -179,6 +202,14 @@ class PantherCollection(PantherDB):
             else:
                 result.append(self.__create_result(r))
         return result
+
+    def first(self, **kwargs) -> PantherDocument | dict | None:
+        return self.find_one(**kwargs)
+
+    def last(self, **kwargs) -> PantherDocument | dict | None:
+        if result := self.find(**kwargs):
+            return result[-1]
+        return None
 
     def all(self) -> list[PantherDocument | dict]:
         if self.return_dict:

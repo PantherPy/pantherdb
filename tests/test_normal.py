@@ -30,6 +30,22 @@ class TestNormalPantherDB(TestCase):
             collection.insert_one(first_name=f'{f.first_name()}{i}', last_name=f'{f.last_name()}{i}')
         return _count
 
+    # Singleton
+    def test_pantherdb_singleton(self):
+        test_1 = PantherDB(db_name='test1')
+        test_2 = PantherDB('test1')
+        self.assertEqual(test_1, test_2)
+
+        default_1 = PantherDB()
+        default_2 = PantherDB()
+        self.assertEqual(default_1, default_2)
+
+        self.assertNotEqual(test_1, default_1)
+        self.assertNotEqual(test_2, default_2)
+
+        Path(test_1.db_name).unlink()
+        Path(default_1.db_name).unlink()
+
     # Create DB
     def test_creation_of_db(self):
         self.assertTrue(Path(self.db_name).exists())
@@ -129,6 +145,180 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
+        self.assertIsNone(obj)
+
+    def test_find_one_with_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.find_one(first_name=f.first_name(), last_name=f.last_name())
+        self.assertIsNone(obj)
+
+    def test_find_one_without_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.find_one()
+        self.assertIsNone(obj)
+
+    # First
+    def test_first_when_its_first(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Insert with specific names
+        collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.first(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.first_name, first_name)
+        self.assertEqual(obj.last_name, last_name)
+
+    def test_first_of_many_finds(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Insert with specific names
+        expected = collection.insert_one(first_name=first_name, last_name=last_name)
+        collection.insert_one(first_name=first_name, last_name=last_name)
+        collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.first(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.id, expected.id)
+
+    def test_first_when_its_last(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Insert with specific names
+        expected = collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Find
+        obj = collection.first(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.first_name, first_name)
+        self.assertEqual(obj.last_name, last_name)
+        self.assertEqual(obj.id, expected.id)
+
+    def test_first_none(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.first(first_name=first_name, last_name=last_name)
+        self.assertIsNone(obj)
+
+    def test_first_with_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.first(first_name=f.first_name(), last_name=f.last_name())
+        self.assertIsNone(obj)
+
+    def test_first_without_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.first()
+        self.assertIsNone(obj)
+
+    # Last
+    def test_last_when_its_first(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Insert with specific names
+        collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.first(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.first_name, first_name)
+        self.assertEqual(obj.last_name, last_name)
+
+    def test_last_of_many_finds(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Insert with specific names
+        collection.insert_one(first_name=first_name, last_name=last_name)
+        collection.insert_one(first_name=first_name, last_name=last_name)
+        expected = collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.last(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.id, expected.id)
+
+    def test_last_when_its_last(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Insert with specific names
+        expected = collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Find
+        obj = collection.last(first_name=first_name, last_name=last_name)
+        self.assertTrue(isinstance(obj, PantherDocument))
+        self.assertEqual(obj.first_name, first_name)
+        self.assertEqual(obj.last_name, last_name)
+        self.assertEqual(obj.id, expected.id)
+
+    def test_last_none(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        last_name = f.last_name()
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Find
+        obj = collection.last(first_name=first_name, last_name=last_name)
+        self.assertIsNone(obj)
+
+    def test_last_with_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.last(first_name=f.first_name(), last_name=f.last_name())
+        self.assertIsNone(obj)
+
+    def test_last_without_kwargs_from_empty_collection(self):
+        collection = self.db.collection(f.word())
+
+        # Find
+        obj = collection.last()
         self.assertIsNone(obj)
 
     # Find
