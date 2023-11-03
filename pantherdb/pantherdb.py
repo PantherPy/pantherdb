@@ -341,7 +341,7 @@ class PantherCollection(PantherDB):
         if not kwargs:
             return len(documents)
 
-        return len(list(self._find(documents, **kwargs)))
+        return len([i for i, _ in self._find(documents, **kwargs) if i is not None])
 
     def drop(self) -> None:
         self._drop_collection()
