@@ -105,13 +105,13 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
   ```
   
 ### Delete:
-- #### Delete documents:
+- #### Delete a document:
   ```python
   user: PantherDocument = db.collection('User').first(first_name='Ali', last_name='Rn')
   user.delete()
   ```
 
-- #### Filter and Delete documents:
+- #### Filter and Delete a document:
   ```python
   is_deleted: bool = db.collection('User').delete_one(first_name='Ali', last_name='Rn')
   ```
