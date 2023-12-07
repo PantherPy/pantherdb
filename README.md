@@ -67,7 +67,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```
     or
     ```python
-    user: PantherDocument = db.collection('User').lasst()
+    user: PantherDocument = db.collection('User').last()
     ```
   
 - #### Find documents:
@@ -86,13 +86,13 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```
 
 ### Update:
-- #### Update documents:
+- #### Update a document:
   ```python
-  user: PantherDocument = db.collection('User').get(first_name='Ali', last_name='Rn')
+  user: PantherDocument = db.collection('User').find_one(first_name='Ali', last_name='Rn')
   user.update(name='Saba')
   ```
 
-- #### Find and Update one:
+- #### Filter and Update a document:
   ```python
   _filter = {'first_name': 'Ali', 'last_name': 'Rn'}
   is_updated: bool = db.collection('User').update_one(_filter, first_name='Saba')
