@@ -82,22 +82,22 @@ class PantherDB:
             file.write(content)
 
     def _refresh(self) -> None:
-        # TODO: Find Solution, so won't refresh on every single query
         with open(self.db_name, 'rb') as file:
+            data = file.read()
 
-            if not (data := file.read()):
-                self.__content = {}
+        if not data:
+            self.__content = {}
 
-            elif not self.secret_key:
-                self.__content = json.loads(data)
+        elif not self.secret_key:
+            self.__content = json.loads(data)
 
-            else:
-                try:
-                    decrypted_data: bytes = self.__fernet.decrypt(data)
-                    self.__content = json.loads(decrypted_data)
-                except InvalidToken:
-                    error = '"secret_key" Is Not Valid'
-                    raise PantherDBException(error)
+        else:
+            try:
+                decrypted_data: bytes = self.__fernet.decrypt(data)
+                self.__content = json.loads(decrypted_data)
+            except InvalidToken:
+                error = '"secret_key" Is Not Valid'
+                raise PantherDBException(error)
 
     def collection(self, collection_name: str) -> PantherCollection:
         return PantherCollection(
