@@ -12,6 +12,13 @@ VERSION = pantherdb_version()
 with open('README.md') as file:
     DESCRIPTION = file.read()
 
+EXTRAS_REQUIRE = {
+    'full': [
+        'cryptography~=41.0',
+    ],
+}
+
+
 setup(
     name='pantherdb',
     version=VERSION,
@@ -32,9 +39,10 @@ setup(
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
     ],
     install_requires=[
         'orjson~=3.9.5',
-        'cryptography~=41.0',
     ],
+    extras_require=EXTRAS_REQUIRE,
 )

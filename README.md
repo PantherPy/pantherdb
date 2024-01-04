@@ -21,6 +21,7 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```
   
 - #### Create an encrypted database:
+    Required `cyptography` install it with `pip install pantherdb[full]`
     ```python
     from cryptography.fernet import Fernet
     key = Fernet.generate_key()  # Should be static (You should not generate new key on every run)

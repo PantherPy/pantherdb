@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import typing
 from pathlib import Path
 from typing import ClassVar, Iterator
 
 import orjson as json
-from cryptography.fernet import Fernet, InvalidToken
 
 
 class PantherDBException(Exception):
@@ -15,7 +15,7 @@ class PantherDB:
     _instances: ClassVar[dict] = {}
     db_name: str = 'database.pdb'
     __secret_key: bytes | None
-    __fernet: Fernet | None
+    __fernet: typing.Any  # type[cryptography.fernet.Fernet | None]
     __return_dict: bool
     __content: dict
 
@@ -30,7 +30,10 @@ class PantherDB:
         else:
             db_name = cls.db_name
 
-        db_name = db_name.removesuffix('.pdb')
+        # Replace with .removesuffix('.pdb') after python3.8 compatible support
+        if db_name.endswith('.pdb'):
+            db_name = db_name[:-4]
+
         if db_name not in cls._instances:
             cls._instances[db_name] = super().__new__(cls)
         return cls._instances[db_name]
@@ -44,8 +47,13 @@ class PantherDB:
     ):
         self.__return_dict = return_dict
         self.__secret_key = secret_key
-        self.__fernet = Fernet(self.__secret_key) if self.__secret_key else None
         self.__content = {}
+        if self.__secret_key:
+            from cryptography.fernet import Fernet
+
+            self.__fernet = Fernet(self.__secret_key)
+        else:
+            self.__fernet = None
 
         if db_name:
             if not db_name.endswith('pdb'):
@@ -95,7 +103,7 @@ class PantherDB:
             try:
                 decrypted_data: bytes = self.__fernet.decrypt(data)
                 self.__content = json.loads(decrypted_data)
-            except InvalidToken:
+            except Exception:  # type[cryptography.fernet.InvalidToken]
                 error = '"secret_key" Is Not Valid'
                 raise PantherDBException(error)
 
