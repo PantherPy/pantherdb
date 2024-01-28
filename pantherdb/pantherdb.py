@@ -24,9 +24,9 @@ class PantherDB:
             return super().__new__(cls)
 
         if args:
-            db_name = args[0]
+            db_name = args[0] or cls.db_name
         elif 'db_name' in kwargs:
-            db_name = kwargs['db_name']
+            db_name = kwargs['db_name'] or cls.db_name
         else:
             db_name = cls.db_name
 
