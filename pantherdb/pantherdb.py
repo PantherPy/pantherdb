@@ -6,6 +6,8 @@ from typing import ClassVar, Iterator
 
 import orjson as json
 
+from pantherdb.ulid import ULID
+
 
 class PantherDBException(Exception):
     pass
@@ -18,6 +20,7 @@ class PantherDB:
     __fernet: typing.Any  # type[cryptography.fernet.Fernet | None]
     __return_dict: bool
     __content: dict
+    __ulid: ULID
 
     def __new__(cls, *args, **kwargs):
         if cls.__name__ != 'PantherDB':
@@ -47,6 +50,7 @@ class PantherDB:
     ):
         self.__return_dict = return_dict
         self.__secret_key = secret_key
+        self.__ulid = ULID()
         self.__content = {}
         if self.__secret_key:
             from cryptography.fernet import Fernet
@@ -75,6 +79,10 @@ class PantherDB:
     @property
     def return_dict(self) -> bool:
         return self.__return_dict
+
+    @property
+    def ulid(self) -> ULID:
+        return self.__ulid
 
     @property
     def secret_key(self) -> bytes | None:
@@ -243,7 +251,7 @@ class PantherCollection(PantherDB):
 
     def insert_one(self, **kwargs) -> PantherDocument | dict:
         documents = self._get_collection()
-        kwargs['_id'] = len(documents) + 1
+        kwargs['_id'] = self.ulid.new()
         documents.append(kwargs)
         self._write_collection(documents)
         return self.__create_result(kwargs)
@@ -376,7 +384,7 @@ class PantherDocument(PantherCollection):
         )
 
     def __str__(self) -> str:
-        items = ', '.join(f'id={v}' if k == '_id' else f'{k}={v}' for k, v in self.data.items())
+        items = ', '.join(f'{k}={v}' for k, v in self.data.items())
         return f'{self.collection_name}({items})'
 
     __repr__ = __str__
@@ -394,6 +402,7 @@ class PantherDocument(PantherCollection):
             '_PantherDB__secret_key',
             '_PantherDB__content',
             '_PantherDB__fernet',
+            '_PantherDB__ulid',
             '_PantherCollection__collection_name',
             '_PantherDocument__data',
         ]:

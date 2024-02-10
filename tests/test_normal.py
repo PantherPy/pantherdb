@@ -34,32 +34,32 @@ class TestNormalPantherDB(TestCase):
     def test_pantherdb_singleton(self):
         test_1 = PantherDB(db_name='test1')
         test_2 = PantherDB('test1')
-        self.assertEqual(test_1, test_2)
+        assert test_1 == test_2
 
         default_1 = PantherDB()
         default_2 = PantherDB()
-        self.assertEqual(default_1, default_2)
+        assert default_1 == default_2
 
-        self.assertNotEqual(test_1, default_1)
-        self.assertNotEqual(test_2, default_2)
+        assert test_1 != default_1
+        assert test_2 != default_2
 
         Path(test_1.db_name).unlink()
         Path(default_1.db_name).unlink()
 
     # Create DB
     def test_creation_of_db(self):
-        self.assertTrue(Path(self.db_name).exists())
-        self.assertTrue(Path(self.db_name).is_file())
-        self.assertEqual(self.db.db_name, self.db_name)
+        assert Path(self.db_name).exists()
+        assert Path(self.db_name).is_file()
+        assert self.db.db_name == self.db_name
 
     def test_creation_of_db_without_extension(self):
         db_name = uuid4().hex
         db = PantherDB(db_name=db_name)
         final_db_name = f'{db_name}.pdb'
 
-        self.assertTrue(Path(final_db_name).exists())
-        self.assertTrue(Path(final_db_name).is_file())
-        self.assertEqual(db.db_name, final_db_name)
+        assert Path(final_db_name).exists()
+        assert Path(final_db_name).is_file()
+        assert db.db_name == final_db_name
 
         Path(final_db_name).unlink()
 
@@ -67,17 +67,17 @@ class TestNormalPantherDB(TestCase):
         collection_name = f.word()
         collection = self.db.collection(collection_name)
 
-        self.assertTrue(bool(collection))
-        self.assertTrue(isinstance(collection, PantherCollection))
-        self.assertEqual(collection.collection_name, collection_name)
-        self.assertEqual(collection.content, {})
-        self.assertEqual(collection.secret_key, None)
+        assert bool(collection)
+        assert isinstance(collection, PantherCollection)
+        assert collection.collection_name == collection_name
+        assert collection.content == {}
+        assert collection.secret_key is None
 
     # Drop
     def test_drop_collection(self):
         collection = self.db.collection(f.word())
         collection.drop()
-        self.assertEqual(collection.content, {})
+        assert collection.content == {}
 
     # Insert
     def test_insert_one(self):
@@ -86,19 +86,21 @@ class TestNormalPantherDB(TestCase):
         last_name = f.last_name()
         obj = collection.insert_one(first_name=first_name, last_name=last_name)
 
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.id, 1)
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
 
     def test_id_assignments(self):
         collection = self.db.collection(f.word())
+        ids = set()
         _count = f.random.randint(2, 10)
         for i in range(_count):
             obj = collection.insert_one(first_name=f.first_name(), last_name=f.last_name())
+            ids.add(obj.id)
+            assert len(obj.id) == 26
 
-        # obj will overwrite after every insert in loop, and we check the last obj
-        self.assertEqual(obj.id, _count)
+        # Each id should be unique
+        assert len(ids) == _count
 
     # Find One
     def test_find_one_first(self):
@@ -114,9 +116,9 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
 
     def test_find_one_last(self):
         collection = self.db.collection(f.word())
@@ -131,9 +133,9 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
 
     def test_find_one_none(self):
         collection = self.db.collection(f.word())
@@ -145,21 +147,21 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_find_one_with_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.find_one(first_name=f.first_name(), last_name=f.last_name())
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_find_one_without_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.find_one()
-        self.assertIsNone(obj)
+        assert obj is None
 
     # First
     def test_first_when_its_first(self):
@@ -175,9 +177,9 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.first(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
 
     def test_first_of_many_finds(self):
         collection = self.db.collection(f.word())
@@ -194,8 +196,8 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.first(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.id, expected.id)
+        assert isinstance(obj, PantherDocument)
+        assert obj.id == expected.id
 
     def test_first_when_its_last(self):
         collection = self.db.collection(f.word())
@@ -210,10 +212,10 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.first(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
-        self.assertEqual(obj.id, expected.id)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
+        assert obj.id == expected.id
 
     def test_first_none(self):
         collection = self.db.collection(f.word())
@@ -225,21 +227,21 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.first(first_name=first_name, last_name=last_name)
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_first_with_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.first(first_name=f.first_name(), last_name=f.last_name())
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_first_without_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.first()
-        self.assertIsNone(obj)
+        assert obj is None
 
     # Last
     def test_last_when_its_first(self):
@@ -255,9 +257,9 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.first(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
 
     def test_last_of_many_finds(self):
         collection = self.db.collection(f.word())
@@ -274,8 +276,8 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.last(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.id, expected.id)
+        assert isinstance(obj, PantherDocument)
+        assert obj.id == expected.id
 
     def test_last_when_its_last(self):
         collection = self.db.collection(f.word())
@@ -290,10 +292,10 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.last(first_name=first_name, last_name=last_name)
-        self.assertTrue(isinstance(obj, PantherDocument))
-        self.assertEqual(obj.first_name, first_name)
-        self.assertEqual(obj.last_name, last_name)
-        self.assertEqual(obj.id, expected.id)
+        assert isinstance(obj, PantherDocument)
+        assert obj.first_name == first_name
+        assert obj.last_name == last_name
+        assert obj.id == expected.id
 
     def test_last_none(self):
         collection = self.db.collection(f.word())
@@ -305,21 +307,21 @@ class TestNormalPantherDB(TestCase):
 
         # Find
         obj = collection.last(first_name=first_name, last_name=last_name)
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_last_with_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.last(first_name=f.first_name(), last_name=f.last_name())
-        self.assertIsNone(obj)
+        assert obj is None
 
     def test_last_without_kwargs_from_empty_collection(self):
         collection = self.db.collection(f.word())
 
         # Find
         obj = collection.last()
-        self.assertIsNone(obj)
+        assert obj is None
 
     # Find
     def test_find_response_type(self):
@@ -330,9 +332,9 @@ class TestNormalPantherDB(TestCase):
         # Find
         objs = collection.find(first_name=first_name)
 
-        self.assertTrue(isinstance(objs, list))
-        self.assertEqual(len(objs), 1)
-        self.assertTrue(isinstance(objs[0], PantherDocument))
+        assert isinstance(objs, list)
+        assert len(objs) == 1
+        assert isinstance(objs[0], PantherDocument)
 
     def test_find_with_filter(self):
         collection = self.db.collection(f.word())
@@ -349,10 +351,10 @@ class TestNormalPantherDB(TestCase):
         # Find
         objs = collection.find(first_name=first_name)
 
-        self.assertTrue(isinstance(objs, list))
-        self.assertEqual(len(objs), _count)
+        assert isinstance(objs, list)
+        assert len(objs) == _count
         for i in range(_count):
-            self.assertEqual(objs[i].first_name, first_name)
+            assert objs[i].first_name == first_name
 
     def test_find_without_filter(self):
         collection = self.db.collection(f.word())
@@ -370,10 +372,10 @@ class TestNormalPantherDB(TestCase):
         objs = collection.find()
         _count_all = _count_1 + _count_2
 
-        self.assertTrue(isinstance(objs, list))
-        self.assertEqual(len(objs), _count_all)
+        assert isinstance(objs, list)
+        assert len(objs) == _count_all
         for i in range(_count_all):
-            self.assertTrue(isinstance(objs[i], PantherDocument))
+            assert isinstance(objs[i], PantherDocument)
 
         # Check count of specific name
         specific_count = 0
@@ -381,7 +383,7 @@ class TestNormalPantherDB(TestCase):
             if objs[i].first_name == first_name:
                 specific_count += 1
 
-        self.assertEqual(specific_count, _count_2)
+        assert specific_count == _count_2
 
     def test_find_all(self):
         collection = self.db.collection(f.word())
@@ -399,10 +401,10 @@ class TestNormalPantherDB(TestCase):
         objs = collection.all()
         _count_all = _count_1 + _count_2
 
-        self.assertTrue(isinstance(objs, list))
-        self.assertEqual(len(objs), _count_all)
+        assert isinstance(objs, list)
+        assert len(objs) == _count_all
         for i in range(_count_all):
-            self.assertTrue(isinstance(objs[i], PantherDocument))
+            assert isinstance(objs[i], PantherDocument)
 
         # Check count of specific name
         specific_count = 0
@@ -410,7 +412,7 @@ class TestNormalPantherDB(TestCase):
             if objs[i].first_name == first_name:
                 specific_count += 1
 
-        self.assertEqual(specific_count, _count_2)
+        assert specific_count == _count_2
 
     # Count
     def test_count_all(self):
@@ -422,8 +424,8 @@ class TestNormalPantherDB(TestCase):
         # Count them
         count_all = collection.count()
 
-        self.assertEqual(count_all, _count)
-        self.assertEqual(count_all, len(collection.all()))
+        assert count_all == _count
+        assert count_all == len(collection.all())
 
     def test_count_with_filter(self):
         collection = self.db.collection(f.word())
@@ -438,8 +440,8 @@ class TestNormalPantherDB(TestCase):
             collection.insert_one(first_name=first_name, last_name=f.last_name())
 
         count_specific = collection.count(first_name=first_name)
-        self.assertEqual(count_specific, _count_2)
-        self.assertEqual(count_specific, len(collection.find(first_name=first_name)))
+        assert count_specific == _count_2
+        assert count_specific == len(collection.find(first_name=first_name))
 
     # Delete Self
     def test_delete(self):
@@ -460,11 +462,11 @@ class TestNormalPantherDB(TestCase):
 
         # Find It Again
         new_obj = collection.find_one(first_name=first_name)
-        self.assertEqual(new_obj, None)
+        assert new_obj is None
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count)
+        assert objs_count == _count
 
     # Delete One
     def test_delete_one(self):
@@ -478,15 +480,15 @@ class TestNormalPantherDB(TestCase):
 
         # Delete One
         is_deleted = collection.delete_one(first_name=first_name)
-        self.assertTrue(is_deleted)
+        assert is_deleted is True
 
         # Find It Again
         new_obj = collection.find_one(first_name=first_name)
-        self.assertEqual(new_obj, None)
+        assert new_obj is None
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count)
+        assert objs_count == _count
 
     def test_delete_one_not_found(self):
         collection = self.db.collection(f.word())
@@ -498,11 +500,11 @@ class TestNormalPantherDB(TestCase):
 
         # Delete One
         is_deleted = collection.delete_one(first_name=first_name)
-        self.assertFalse(is_deleted)
+        assert is_deleted is False
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count)
+        assert objs_count == _count
 
     def test_delete_one_first(self):
         collection = self.db.collection(f.word())
@@ -517,15 +519,15 @@ class TestNormalPantherDB(TestCase):
 
         # Delete One
         is_deleted = collection.delete_one(first_name=first_name)
-        self.assertTrue(is_deleted)
+        assert is_deleted is True
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count_1 + _count_2 - 1)
+        assert objs_count == (_count_1 + _count_2 - 1)
 
         # Count of undeleted
         undeleted_count = collection.count(first_name=first_name)
-        self.assertEqual(undeleted_count, _count_2 - 1)
+        assert undeleted_count == (_count_2 - 1)
 
     # Delete Many
     def test_delete_many(self):
@@ -542,11 +544,11 @@ class TestNormalPantherDB(TestCase):
 
         # Delete Many
         deleted_count = collection.delete_many(first_name=first_name)
-        self.assertEqual(deleted_count, _count_2)
+        assert deleted_count == _count_2
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count_1)
+        assert objs_count == _count_1
 
     def test_delete_many_not_found(self):
         collection = self.db.collection(f.word())
@@ -558,11 +560,11 @@ class TestNormalPantherDB(TestCase):
 
         # Delete Many
         deleted_count = collection.delete_many(first_name=first_name)
-        self.assertEqual(deleted_count, 0)
+        assert deleted_count == 0
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count)
+        assert objs_count == _count
 
     # Update Self
     def test_update(self):
@@ -579,15 +581,15 @@ class TestNormalPantherDB(TestCase):
         obj = collection.find_one(first_name=first_name)
         new_name = f.first_name()
         obj.update(first_name=new_name)
-        self.assertEqual(obj.first_name, new_name)
+        assert obj.first_name == new_name
 
         # Find with old name
         old_obj = collection.find_one(first_name=first_name)
-        self.assertIsNone(old_obj)
+        assert old_obj is None
 
         # Find with new name
         obj = collection.find_one(first_name=new_name)
-        self.assertEqual(obj.first_name, new_name)
+        assert obj.first_name == new_name
 
     # Update One
     def test_update_one_single_document(self):
@@ -603,15 +605,15 @@ class TestNormalPantherDB(TestCase):
         # Update One
         new_name = f.first_name()
         is_updated = collection.update_one({'first_name': first_name}, first_name=new_name)
-        self.assertTrue(is_updated)
+        assert is_updated is True
 
         # Find with old name
         old_obj = collection.find_one(first_name=first_name)
-        self.assertIsNone(old_obj)
+        assert old_obj is None
 
         # Find with new name
         obj = collection.find_one(first_name=new_name)
-        self.assertEqual(obj.first_name, new_name)
+        assert obj.first_name == new_name
 
     def test_update_one_single_document_not_found(self):
         collection = self.db.collection(f.word())
@@ -626,15 +628,15 @@ class TestNormalPantherDB(TestCase):
         # Update One
         new_name = f.first_name()
         is_updated = collection.update_one({'first_name': f.first_name()}, first_name=new_name)
-        self.assertFalse(is_updated)
+        assert is_updated is False
 
         # Find with old name
         old_obj = collection.find_one(first_name=first_name)
-        self.assertIsNotNone(old_obj)
+        assert old_obj is not None
 
         # Find with new name
         obj = collection.find_one(first_name=new_name)
-        self.assertIsNone(obj)
+        assert obj is None
 
     # Update Many
     def test_update_many(self):
@@ -652,19 +654,19 @@ class TestNormalPantherDB(TestCase):
         # Update Many
         new_name = f.first_name()
         updated_count = collection.update_many({'first_name': first_name}, first_name=new_name)
-        self.assertEqual(updated_count, _count_2)
+        assert updated_count == _count_2
 
         # Find Them with old name
         objs = collection.find(first_name=first_name)
-        self.assertFalse(objs)
+        assert objs == []
 
         # Find Them with new name
         objs = collection.find(first_name=new_name)
-        self.assertEqual(len(objs), _count_2)
+        assert len(objs) == _count_2
 
         # Count of all
         objs_count = collection.count()
-        self.assertEqual(objs_count, _count_1 + _count_2)
+        assert objs_count == (_count_1 + _count_2)
 
     # Fields
     def test_document_fields(self):
@@ -678,7 +680,7 @@ class TestNormalPantherDB(TestCase):
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
 
-        self.assertEqual(set(obj.data.keys()), {'first_name', 'last_name', '_id'})
+        assert set(obj.data.keys()) == {'first_name', 'last_name', '_id'}
 
     # Save
     def test_document_save_method(self):
@@ -696,15 +698,15 @@ class TestNormalPantherDB(TestCase):
         obj.first_name = new_name
         obj.save()
 
-        self.assertEqual(obj.first_name, new_name)
+        assert obj.first_name == new_name
 
         # Find with old name
         old_obj = collection.find_one(first_name=first_name)
-        self.assertIsNone(old_obj)
+        assert old_obj is None
 
         # Find with new name
         obj = collection.find_one(first_name=new_name)
-        self.assertEqual(obj.first_name, new_name)
+        assert obj.first_name == new_name
 
     # Json
     def test_document_json_method(self):
@@ -721,9 +723,9 @@ class TestNormalPantherDB(TestCase):
         _json = {
             'first_name': first_name,
             'last_name': last_name,
-            '_id': 1,
+            '_id': obj.id,
         }
-        self.assertEqual(obj.json(), json.dumps(_json).decode())
+        assert obj.json() == json.dumps(_json).decode()
 
 
 # TODO: Test whole scenario with -> secret_key, return_dict

@@ -126,4 +126,3 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
 - [x] Add encryption
 - [ ] Complete tests TODO
 - [ ] Add B+ tree
-- [ ] Find better encryption solution
