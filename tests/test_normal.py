@@ -6,7 +6,7 @@ from uuid import uuid4
 import orjson as json
 from faker import Faker
 
-from pantherdb import PantherCollection, PantherDB, PantherDocument
+from pantherdb import PantherCollection, PantherDB, PantherDocument, Cursor
 
 f = Faker()
 
@@ -55,7 +55,7 @@ class TestNormalPantherDB(TestCase):
     def test_creation_of_db_without_extension(self):
         db_name = uuid4().hex
         db = PantherDB(db_name=db_name)
-        final_db_name = f'{db_name}.pdb'
+        final_db_name = f'{db_name}.json'
 
         assert Path(final_db_name).exists()
         assert Path(final_db_name).is_file()
@@ -385,48 +385,7 @@ class TestNormalPantherDB(TestCase):
 
         assert specific_count == _count_2
 
-    def test_find_all(self):
-        collection = self.db.collection(f.word())
-
-        # Add others
-        _count_1 = self.create_junk_document(collection)
-
-        # Insert with specific names
-        first_name = f.first_name()
-        _count_2 = f.random.randint(2, 10)
-        for i in range(_count_2):
-            collection.insert_one(first_name=first_name, last_name=f.last_name())
-
-        # Find
-        objs = collection.all()
-        _count_all = _count_1 + _count_2
-
-        assert isinstance(objs, list)
-        assert len(objs) == _count_all
-        for i in range(_count_all):
-            assert isinstance(objs[i], PantherDocument)
-
-        # Check count of specific name
-        specific_count = 0
-        for i in range(_count_all):
-            if objs[i].first_name == first_name:
-                specific_count += 1
-
-        assert specific_count == _count_2
-
     # Count
-    def test_count_all(self):
-        collection = self.db.collection(f.word())
-
-        # Add others
-        _count = self.create_junk_document(collection)
-
-        # Count them
-        count_all = collection.count()
-
-        assert count_all == _count
-        assert count_all == len(collection.all())
-
     def test_count_with_filter(self):
         collection = self.db.collection(f.word())
 
@@ -726,6 +685,157 @@ class TestNormalPantherDB(TestCase):
             '_id': obj.id,
         }
         assert obj.json() == json.dumps(_json).decode()
+
+class TestCursorPantherDB(TestCase):
+
+    @classmethod
+    def setUp(cls):
+        cls.db_name = uuid4().hex
+        cls.db_name = f'{cls.db_name}.pdb'
+        cls.db = PantherDB(db_name=cls.db_name, return_cursor=True)
+
+    @classmethod
+    def tearDown(cls):
+        Path(cls.db_name).unlink()
+
+    @classmethod
+    def create_junk_document(cls, collection) -> int:
+        _count = f.random.randint(2, 10)
+        for i in range(_count):
+            collection.insert_one(first_name=f'{f.first_name()}{i}', last_name=f'{f.last_name()}{i}')
+        return _count
+
+    # Find
+    def test_find_response_type(self):
+        collection = self.db.collection(f.word())
+        first_name = f.first_name()
+        collection.insert_one(first_name=first_name, last_name=f.last_name())
+
+        # Find
+        objs = collection.find(first_name=first_name)
+
+        assert isinstance(objs, Cursor)
+        assert len([o for o in objs]) == 1
+        assert isinstance(objs[0], PantherDocument)
+
+    def test_find_with_filter(self):
+        collection = self.db.collection(f.word())
+
+        # Add others
+        self.create_junk_document(collection)
+
+        # Insert with specific names
+        first_name = f.first_name()
+        _count = f.random.randint(2, 10)
+        last_names = []
+        for i in range(_count):
+            last_name = f.last_name()
+            last_names.append(last_name)
+            collection.insert_one(first_name=first_name, last_name=last_name)
+
+        # Find
+        objs = collection.find(first_name=first_name)
+
+        assert isinstance(objs, Cursor)
+        assert len([o for o in objs]) == _count
+        for i in range(_count):
+            assert objs[i].first_name == first_name
+            assert objs[i].last_name == last_names[i]
+
+    def test_find_without_filter(self):
+        collection = self.db.collection(f.word())
+
+        # Add others
+        _count_1 = self.create_junk_document(collection)
+
+        # Insert with specific names
+        first_name = f.first_name()
+        _count_2 = f.random.randint(2, 10)
+        for i in range(_count_2):
+            collection.insert_one(first_name=first_name, last_name=f.last_name())
+
+        # Find
+        objs = collection.find()
+        _count_all = _count_1 + _count_2
+
+        assert isinstance(objs, Cursor)
+        assert len([o for o in objs]) == _count_all
+        for i in range(_count_all):
+            assert isinstance(objs[i], PantherDocument)
+
+        # Check count of specific name
+        specific_count = 0
+        for i in range(_count_all):
+            if objs[i].first_name == first_name:
+                specific_count += 1
+
+        assert specific_count == _count_2
+
+    def test_find_with_sort(self):
+        collection = self.db.collection(f.word())
+
+        # Insert with specific values
+        collection.insert_one(first_name='A', last_name=0)
+        collection.insert_one(first_name='A', last_name=1)
+        collection.insert_one(first_name='B', last_name=0)
+        collection.insert_one(first_name='B', last_name=1)
+
+        # Find without sort
+        objs = collection.find()
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('A', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('B', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
+
+        # Find with single sort
+        objs = collection.find().sort([('first_name', 1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('A', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('B', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
+
+        objs = collection.find().sort([('first_name', -1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('B', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('B', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('A', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('A', 1)
+
+        objs = collection.find().sort([('last_name', 1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('B', 0)
+        assert (objs[2].first_name, objs[2].last_name) == ('A', 1)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
+
+        objs = collection.find().sort([('last_name', -1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 1)
+        assert (objs[1].first_name, objs[1].last_name) == ('B', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('A', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 0)
+
+        # Find with multiple sort
+        objs = collection.find().sort([('first_name', 1), ('last_name', 1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('A', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('B', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
+
+        objs = collection.find().sort([('first_name', 1), ('last_name', -1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 1)
+        assert (objs[1].first_name, objs[1].last_name) == ('A', 0)
+        assert (objs[2].first_name, objs[2].last_name) == ('B', 1)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 0)
+
+        objs = collection.find().sort([('first_name', -1), ('last_name', 1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('B', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('B', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('A', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('A', 1)
+
+        objs = collection.find().sort([('first_name', -1), ('last_name', -1)])
+        assert (objs[0].first_name, objs[0].last_name) == ('B', 1)
+        assert (objs[1].first_name, objs[1].last_name) == ('B', 0)
+        assert (objs[2].first_name, objs[2].last_name) == ('A', 1)
+        assert (objs[3].first_name, objs[3].last_name) == ('A', 0)
 
 
 # TODO: Test whole scenario with -> secret_key, return_dict

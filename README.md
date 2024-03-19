@@ -75,10 +75,9 @@ PantherDB is a <b>Simple</b>, <b>FileBase</b> and <b>Document Oriented</b> datab
     ```python
     users: list[PantherDocument] = db.collection('User').find(last_name='Rn')
     ```
-
-- #### All documents:
+    or all documents
     ```python
-    users: list[PantherDocument] = db.collection('User').all()
+    users: list[PantherDocument] = db.collection('User').find()
     ```
 
 - #### Count documents:

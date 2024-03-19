@@ -1,6 +1,3 @@
-from pantherdb.pantherdb import *  # noqa: F403
+from pantherdb.pantherdb import PantherDB, PantherCollection, PantherDocument, PantherDBException, Cursor
 
-__version__ = '1.4.0'
-
-
-__all__ = ('__version__', 'PantherDB', 'PantherCollection', 'PantherDocument', 'PantherDBException')
+__version__ = '2.0.0'

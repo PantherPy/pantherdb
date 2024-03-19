@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import typing
 from pathlib import Path
-from typing import ClassVar, Iterator
+from typing import ClassVar, Iterator, Any, List, Tuple, Union
 
 import orjson as json
 
@@ -17,8 +16,9 @@ class PantherDB:
     _instances: ClassVar[dict] = {}
     db_name: str = 'database.pdb'
     __secret_key: bytes | None
-    __fernet: typing.Any  # type[cryptography.fernet.Fernet | None]
+    __fernet: Any  # type[cryptography.fernet.Fernet | None]
     __return_dict: bool
+    __return_cursor: bool
     __content: dict
     __ulid: ULID
 
@@ -36,6 +36,8 @@ class PantherDB:
         # Replace with .removesuffix('.pdb') after python3.8 compatible support
         if db_name.endswith('.pdb'):
             db_name = db_name[:-4]
+        elif db_name.endswith('.json'):
+            db_name = db_name[:-5]
 
         if db_name not in cls._instances:
             cls._instances[db_name] = super().__new__(cls)
@@ -46,9 +48,11 @@ class PantherDB:
             db_name: str | None = None,
             *,
             return_dict: bool = False,
+            return_cursor: bool = False,
             secret_key: bytes | None = None,
     ):
         self.__return_dict = return_dict
+        self.__return_cursor = return_cursor
         self.__secret_key = secret_key
         self.__ulid = ULID()
         self.__content = {}
@@ -60,8 +64,11 @@ class PantherDB:
             self.__fernet = None
 
         if db_name:
-            if not db_name.endswith('pdb'):
-                db_name = f'{db_name}.pdb'
+            if not db_name.endswith(('pdb', 'json')):
+                if self.__secret_key:
+                    db_name = f'{db_name}.pdb'
+                else:
+                    db_name = f'{db_name}.json'
             self.db_name = db_name
         Path(self.db_name).touch(exist_ok=True)
 
@@ -75,6 +82,10 @@ class PantherDB:
     @property
     def content(self) -> dict:
         return self.__content
+
+    @property
+    def return_cursor(self) -> bool:
+        return self.__return_cursor
 
     @property
     def return_dict(self) -> bool:
@@ -110,16 +121,18 @@ class PantherDB:
         else:
             try:
                 decrypted_data: bytes = self.__fernet.decrypt(data)
-                self.__content = json.loads(decrypted_data)
             except Exception:  # type[cryptography.fernet.InvalidToken]
                 error = '"secret_key" Is Not Valid'
                 raise PantherDBException(error)
+
+            self.__content = json.loads(decrypted_data)
 
     def collection(self, collection_name: str) -> PantherCollection:
         return PantherCollection(
             db_name=self.db_name,
             collection_name=collection_name,
             return_dict=self.return_dict,
+            return_cursor=self.return_cursor,
             secret_key=self.secret_key,
         )
 
@@ -136,9 +149,10 @@ class PantherCollection(PantherDB):
             *,
             collection_name: str,
             return_dict: bool,
+            return_cursor: bool,
             secret_key: bytes,
     ):
-        super().__init__(db_name=db_name, return_dict=return_dict, secret_key=secret_key)
+        super().__init__(db_name=db_name, return_dict=return_dict, return_cursor=return_cursor, secret_key=secret_key)
         self.__collection_name = collection_name
 
     def __str__(self) -> str:
@@ -167,6 +181,7 @@ class PantherCollection(PantherDB):
             db_name=self.db_name,
             collection_name=self.collection_name,
             return_dict=self.return_dict,
+            return_cursor=self.return_cursor,
             secret_key=self.secret_key,
             **data,
         )
@@ -213,17 +228,14 @@ class PantherCollection(PantherDB):
             # Return the first document
             return d
 
-    def find(self, **kwargs) -> list[PantherDocument | dict]:
+    def find(self, **kwargs) -> Cursor | List[PantherDocument | dict]:
         documents = self._get_collection()
 
-        # Empty Collection
-        if not documents:
-            return []
+        result = [d for _, d in self._find(documents, **kwargs) if d is not None]
 
-        if not kwargs:
-            return self.all()
-
-        return [d for _, d in self._find(documents, **kwargs) if d is not None]
+        if self.return_cursor:
+            return Cursor(result)
+        return result
 
     def first(self, **kwargs) -> PantherDocument | dict | None:
         return self.find_one(**kwargs)
@@ -242,12 +254,6 @@ class PantherCollection(PantherDB):
         for _, d in self._find(documents, **kwargs):
             # Return the first one
             return d
-
-    def all(self) -> list[PantherDocument | dict]:
-        if self.return_dict:
-            return self._get_collection()
-        else:
-            return [self.__create_result(r) for r in self._get_collection()]
 
     def insert_one(self, **kwargs) -> PantherDocument | dict:
         documents = self._get_collection()
@@ -372,6 +378,7 @@ class PantherDocument(PantherCollection):
             *,
             collection_name: str,
             return_dict: bool,
+            return_cursor: bool,
             secret_key: bytes,
             **kwargs,
     ):
@@ -380,6 +387,7 @@ class PantherDocument(PantherCollection):
             db_name=db_name,
             collection_name=collection_name,
             return_dict=return_dict,
+            return_cursor=return_cursor,
             secret_key=secret_key,
         )
 
@@ -399,6 +407,7 @@ class PantherDocument(PantherCollection):
     def __setattr__(self, key, value):
         if key not in [
             '_PantherDB__return_dict',
+            '_PantherDB__return_cursor',
             '_PantherDB__secret_key',
             '_PantherDB__content',
             '_PantherDB__fernet',
@@ -413,6 +422,10 @@ class PantherDocument(PantherCollection):
                 return
 
         super().__setattr__(key, value)
+
+    __setitem__ = __setattr__
+
+    __getitem__ = __getattr__
 
     @property
     def id(self) -> int:
@@ -434,3 +447,27 @@ class PantherDocument(PantherCollection):
 
     def json(self) -> str:
         return json.dumps(self.data).decode()
+
+
+class Cursor:
+    def __init__(self, documents: List[dict | PantherDocument]):
+        self.documents = documents
+        self._cursor = 0
+
+    def next(self):
+        try:
+            result = self.documents[self._cursor]
+        except IndexError:
+            raise StopIteration
+        self._cursor += 1
+        return result
+
+    __next__ = next
+
+    def __getitem__(self, index: int | slice) -> Union[Cursor, dict, ...]:
+        return self.documents[index]
+
+    def sort(self, sorts: List[Tuple[str, int]]):
+        for sort in sorts[::-1]:
+            self.documents.sort(key=lambda x: x[sort[0]], reverse=bool(sort[1] == -1))
+        return self
