@@ -234,7 +234,7 @@ class PantherCollection(PantherDB):
         result = [d for _, d in self._find(documents, **kwargs) if d is not None]
 
         if self.return_cursor:
-            return Cursor(result)
+            return Cursor(result, kwargs)
         return result
 
     def first(self, **kwargs) -> PantherDocument | dict | None:
@@ -450,24 +450,72 @@ class PantherDocument(PantherCollection):
 
 
 class Cursor:
-    def __init__(self, documents: List[dict | PantherDocument]):
+    def __init__(self, documents: List[dict | PantherDocument], kwargs: dict):
         self.documents = documents
-        self._cursor = 0
+        self.filter = kwargs  # Used in Panther
+        self._cursor = -1
+        self._limit = None
+        self._sorts = None
+        self._skip = None
+        self.cls = None
+        self.response_type = None
+        self._condition_applied = False
 
     def next(self):
+        if not self._condition_applied:
+            self._apply_conditions()
+
+        self._cursor += 1
+        if self._limit and self._cursor > self._limit:
+            raise StopIteration
+
         try:
             result = self.documents[self._cursor]
         except IndexError:
             raise StopIteration
-        self._cursor += 1
+
+        if self.response_type:
+            return self.response_type(result)
         return result
 
     __next__ = next
 
     def __getitem__(self, index: int | slice) -> Union[Cursor, dict, ...]:
-        return self.documents[index]
+        if not self._condition_applied:
+            self._apply_conditions()
+
+        result = self.documents[index]
+        if isinstance(index, int) and self.response_type:
+            return self.response_type(result)
+        return result
 
     def sort(self, sorts: List[Tuple[str, int]]):
-        for sort in sorts[::-1]:
-            self.documents.sort(key=lambda x: x[sort[0]], reverse=bool(sort[1] == -1))
+        self._sorts = sorts
         return self
+
+    def skip(self, skip):
+        self._skip = skip
+        return self
+
+    def limit(self, limit: int):
+        self._limit = limit
+        return self
+
+    def _apply_conditions(self):
+        self._apply_sort()
+        self._apply_skip()
+        self._apply_limit()
+        self._condition_applied = True
+
+    def _apply_sort(self):
+        if self._sorts:
+            for sort in self._sorts[::-1]:
+                self.documents.sort(key=lambda x: x[sort[0]], reverse=bool(sort[1] == -1))
+
+    def _apply_skip(self):
+        if self._skip:
+            self.documents = self.documents[self._skip:]
+
+    def _apply_limit(self):
+        if self._limit:
+            self.documents = self.documents[:self._limit]
