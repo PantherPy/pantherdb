@@ -788,6 +788,13 @@ class TestCursorPantherDB(TestCase):
         assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
 
         # Find with single sort
+        objs = collection.find().sort('first_name', 1)
+        assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
+        assert (objs[1].first_name, objs[1].last_name) == ('A', 1)
+        assert (objs[2].first_name, objs[2].last_name) == ('B', 0)
+        assert (objs[3].first_name, objs[3].last_name) == ('B', 1)
+
+        # Find with single sort as a list
         objs = collection.find().sort([('first_name', 1)])
         assert (objs[0].first_name, objs[0].last_name) == ('A', 0)
         assert (objs[1].first_name, objs[1].last_name) == ('A', 1)

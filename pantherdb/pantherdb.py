@@ -459,10 +459,10 @@ class Cursor:
         self._skip = None
         self.cls = None
         self.response_type = None
-        self._condition_applied = False
+        self._conditions_applied = False
 
     def next(self):
-        if not self._condition_applied:
+        if not self._conditions_applied:
             self._apply_conditions()
 
         self._cursor += 1
@@ -481,7 +481,7 @@ class Cursor:
     __next__ = next
 
     def __getitem__(self, index: int | slice) -> Union[Cursor, dict, ...]:
-        if not self._condition_applied:
+        if not self._conditions_applied:
             self._apply_conditions()
 
         result = self.documents[index]
@@ -489,8 +489,11 @@ class Cursor:
             return self.response_type(result)
         return result
 
-    def sort(self, sorts: List[Tuple[str, int]]):
-        self._sorts = sorts
+    def sort(self, sorts: List[Tuple[str, int]] | str, sort_order: int = None):
+        if isinstance(sorts, str):
+            self._sorts = [(sorts, sort_order)]
+        else:
+            self._sorts = sorts
         return self
 
     def skip(self, skip):
@@ -505,7 +508,7 @@ class Cursor:
         self._apply_sort()
         self._apply_skip()
         self._apply_limit()
-        self._condition_applied = True
+        self._conditions_applied = True
 
     def _apply_sort(self):
         if self._sorts:

@@ -25,7 +25,7 @@ setup(
     python_requires='>=3.8',
     author='Ali RajabNezhad',
     author_email='alirn76@yahoo.com',
-    url='https://github.com/alirn76/pantherdb',
+    url='https://github.com/PantherPy/pantherdb',
     description='is a Simple, FileBase and Document Oriented database',
     long_description=DESCRIPTION,
     long_description_content_type='text/markdown',
