@@ -33,6 +33,7 @@ class PantherDB:
         else:
             db_name = cls.db_name
 
+        db_name = str(db_name)  # Can be PosixPath
         # Replace with .removesuffix('.pdb') after python3.8 compatible support
         if db_name.endswith('.pdb'):
             db_name = db_name[:-4]
