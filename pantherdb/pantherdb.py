@@ -4,8 +4,7 @@ from pathlib import Path
 from typing import ClassVar, Iterator, Any, List, Tuple, Union
 
 import orjson as json
-
-from pantherdb.ulid import ULID
+import ulid
 
 
 class PantherDBException(Exception):
@@ -16,11 +15,10 @@ class PantherDB:
     _instances: ClassVar[dict] = {}
     db_name: str = 'database.pdb'
     __secret_key: bytes | None
-    __fernet: Any  # type[cryptography.fernet.Fernet | None]
+    __fernet: Any  # type: cryptography.fernet.Fernet | None
     __return_dict: bool
     __return_cursor: bool
     __content: dict
-    __ulid: ULID
 
     def __new__(cls, *args, **kwargs):
         if cls.__name__ != 'PantherDB':
@@ -55,7 +53,6 @@ class PantherDB:
         self.__return_dict = return_dict
         self.__return_cursor = return_cursor
         self.__secret_key = secret_key
-        self.__ulid = ULID()
         self.__content = {}
         if self.__secret_key:
             from cryptography.fernet import Fernet
@@ -91,10 +88,6 @@ class PantherDB:
     @property
     def return_dict(self) -> bool:
         return self.__return_dict
-
-    @property
-    def ulid(self) -> ULID:
-        return self.__ulid
 
     @property
     def secret_key(self) -> bytes | None:
@@ -258,7 +251,7 @@ class PantherCollection(PantherDB):
 
     def insert_one(self, **kwargs) -> PantherDocument | dict:
         documents = self._get_collection()
-        kwargs['_id'] = self.ulid.new()
+        kwargs['_id'] = ulid.new()
         documents.append(kwargs)
         self._write_collection(documents)
         return self.__create_result(kwargs)
