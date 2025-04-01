@@ -313,6 +313,8 @@ class PantherCollection(PantherDB):
     def update(self, **kwargs) -> None:
         self.__check_is_panther_document()
         documents = self._get_collection()
+        kwargs.pop('_id', None)
+
         for d in documents:
             if d.get('_id') == self._id:  # noqa: Unresolved References
                 for k, v in kwargs.items():
@@ -327,6 +329,7 @@ class PantherCollection(PantherDB):
         if not condition:
             return result
 
+        kwargs.pop('_id', None)
         for d in documents:
             for k, v in condition.items():
                 if d.get(k) != v:
@@ -345,6 +348,7 @@ class PantherCollection(PantherDB):
         if not condition:
             return 0
 
+        kwargs.pop('_id', None)
         updated_count = 0
         for d in documents:
             for k, v in condition.items():
