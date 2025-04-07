@@ -42,7 +42,7 @@ setup(
         'Programming Language :: Python :: 3.13',
     ],
     install_requires=[
-        'orjson~=3.10.16',
+        'orjson~=3.9.15',
         'simple-ulid~=1.0.0'
     ],
     extras_require=EXTRAS_REQUIRE,
