@@ -1,6 +1,6 @@
 
 from pathlib import Path
-from unittest import TestCase
+from unittest import TestCase, IsolatedAsyncioTestCase
 from uuid import uuid4
 
 import orjson as json
@@ -686,7 +686,7 @@ class TestNormalPantherDB(TestCase):
         }
         assert obj.json() == json.dumps(_json).decode()
 
-class TestCursorPantherDB(TestCase):
+class TestCursorPantherDB(IsolatedAsyncioTestCase):
 
     @classmethod
     def setUp(cls):
@@ -843,6 +843,50 @@ class TestCursorPantherDB(TestCase):
         assert (objs[1].first_name, objs[1].last_name) == ('B', 0)
         assert (objs[2].first_name, objs[2].last_name) == ('A', 1)
         assert (objs[3].first_name, objs[3].last_name) == ('A', 0)
+
+    async def test_find_iterations(self):
+        collection = self.db.collection(f.word())
+
+        # Insert with specific values
+        collection.insert_one(first_name='A', last_name=0)
+        collection.insert_one(first_name='A', last_name=1)
+        collection.insert_one(first_name='B', last_name=0)
+        collection.insert_one(first_name='B', last_name=1)
+
+        # Find without sort
+        expected_without_sort_data = {
+            0: ('A', 0),
+            1: ('A', 1),
+            2: ('B', 0),
+            3: ('B', 1),
+        }
+        objs = collection.find()
+        for i, obj in enumerate(objs):
+            assert (obj.first_name, obj.last_name) == expected_without_sort_data[i]
+
+        i = 0
+        async_objs = collection.find()
+        async for obj in async_objs:
+            assert (obj.first_name, obj.last_name) == expected_without_sort_data[i]
+            i += 1
+
+        # # Find Single sort
+        expected_single_sort_data = {
+            0: ('B', 0),
+            1: ('B', 1),
+            2: ('A', 0),
+            3: ('A', 1),
+        }
+        objs = collection.find().sort('first_name', -1)
+        for i, obj in enumerate(objs):
+            assert (obj.first_name, obj.last_name) == expected_single_sort_data[i]
+
+        i = 0
+        async_objs = collection.find().sort('first_name', -1)
+        async for obj in async_objs:
+            assert (obj.first_name, obj.last_name) == expected_single_sort_data[i]
+            i += 1
+
 
 
 # TODO: Test whole scenario with -> secret_key, return_dict

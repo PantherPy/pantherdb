@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import ClassVar, Iterator, Any, List, Tuple, Union
 
@@ -459,24 +460,38 @@ class Cursor:
         self.response_type = None
         self._conditions_applied = False
 
-    def next(self):
+    def __aiter__(self):
+        return self
+
+    async def next(self, is_async: bool = False):
+        error = StopAsyncIteration if is_async else StopIteration
+
         if not self._conditions_applied:
             self._apply_conditions()
 
         self._cursor += 1
         if self._limit and self._cursor > self._limit:
-            raise StopIteration
+            raise error
 
         try:
             result = self.documents[self._cursor]
         except IndexError:
-            raise StopIteration
+            raise error
 
-        if self.response_type:
-            return self.response_type(result)
-        return result
+        # Return pure result
+        if self.response_type is None:
+            return result
 
-    __next__ = next
+        # Convert the result then return
+        if self.is_function_async(self.response_type):
+            return await self.response_type(result)
+        return self.response_type(result)
+
+    def __next__(self):
+        return self._run_coroutine(self.next())
+
+    async def __anext__(self):
+        return await self.next(is_async=True)
 
     def __getitem__(self, index: int | slice) -> Union[Cursor, dict, ...]:
         if not self._conditions_applied:
@@ -484,7 +499,7 @@ class Cursor:
 
         result = self.documents[index]
         if isinstance(index, int) and self.response_type:
-            return self.response_type(result)
+            return self._run_coroutine(self.response_type(result))
         return result
 
     def sort(self, sorts: List[Tuple[str, int]] | str, sort_order: int = None):
@@ -520,3 +535,20 @@ class Cursor:
     def _apply_limit(self):
         if self._limit:
             self.documents = self.documents[:self._limit]
+
+    @classmethod
+    def _run_coroutine(cls, coroutine):
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coroutine)
+
+    @classmethod
+    def is_function_async(cls, func: Callable) -> bool:
+        """
+        Sync result is 0 --> False
+        async result is 128 --> True
+        """
+        return bool(func.__code__.co_flags & (1 << 7))
