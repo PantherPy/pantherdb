@@ -539,11 +539,18 @@ class Cursor:
     @classmethod
     def _run_coroutine(cls, coroutine):
         try:
-            loop = asyncio.get_event_loop()
+            # Try to get the current event loop
+            _ = asyncio.get_running_loop()
+            # If we're inside an event loop, create a new task
+            return asyncio.create_task(coroutine)
         except RuntimeError:
+            # If we're not in an event loop, create a new one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coroutine)
+            try:
+                return loop.run_until_complete(coroutine)
+            finally:
+                loop.close()
 
     @classmethod
     def is_function_async(cls, func: Callable) -> bool:
