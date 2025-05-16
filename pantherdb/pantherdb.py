@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
+from threading import Thread
 from typing import ClassVar, Iterator, Any, List, Tuple, Union
 
 import orjson as json
@@ -539,18 +540,28 @@ class Cursor:
     @classmethod
     def _run_coroutine(cls, coroutine):
         try:
-            # Try to get the current event loop
-            _ = asyncio.get_running_loop()
-            # If we're inside an event loop, create a new task
-            return asyncio.create_task(coroutine)
+            # Check if there's an event loop already running in this thread
+            asyncio.get_running_loop()
         except RuntimeError:
-            # If we're not in an event loop, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # No event loop is running in this thread — safe to use asyncio.run
+            return asyncio.run(coroutine)
+
+        # Since we cannot block a running event loop with run_until_complete,
+        # we execute the coroutine in a separate thread with its own event loop.
+        result = []
+
+        def run_in_thread():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
             try:
-                return loop.run_until_complete(coroutine)
+                result.append(new_loop.run_until_complete(coroutine))
             finally:
-                loop.close()
+                new_loop.close()
+        thread = Thread(target=run_in_thread)
+        thread.start()
+        thread.join()
+        return result[0]
+
 
     @classmethod
     def is_function_async(cls, func: Callable) -> bool:
