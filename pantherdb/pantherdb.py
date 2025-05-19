@@ -63,6 +63,7 @@ class PantherDB:
         else:
             self.__fernet = None
 
+        db_name = str(db_name)  # Can be PosixPath
         if db_name:
             if not db_name.endswith(('pdb', 'json')):
                 if self.__secret_key:
