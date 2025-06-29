@@ -52,6 +52,12 @@ class TestNormalPantherDB(TestCase):
         assert Path(self.db_name).is_file()
         assert self.db.db_name == self.db_name
 
+    def test_create_db_without_name(self):
+        db = PantherDB()
+        assert db.db_name == PantherDB.db_name
+        assert Path(db.db_name).exists()
+        assert Path(db.db_name).is_file()
+
     def test_creation_of_db_without_extension(self):
         db_name = uuid4().hex
         db = PantherDB(db_name=db_name)

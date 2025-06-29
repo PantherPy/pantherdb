@@ -63,9 +63,9 @@ class PantherDB:
         else:
             self.__fernet = None
 
-        db_name = str(db_name)  # Can be PosixPath
         if db_name:
-            if not db_name.endswith(('pdb', 'json')):
+            db_name = str(db_name)  # Can be PosixPath
+            if not db_name.endswith(('.pdb', '.json')):
                 if self.__secret_key:
                     db_name = f'{db_name}.pdb'
                 else:
@@ -118,7 +118,7 @@ class PantherDB:
         else:
             try:
                 decrypted_data: bytes = self.__fernet.decrypt(data)
-            except Exception:  # type[cryptography.fernet.InvalidToken]
+            except Exception:  # type: type[cryptography.fernet.InvalidToken]
                 error = '"secret_key" Is Not Valid'
                 raise PantherDBException(error)
 
