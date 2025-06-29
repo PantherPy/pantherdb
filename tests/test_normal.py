@@ -76,14 +76,14 @@ class TestNormalPantherDB(TestCase):
         assert bool(collection)
         assert isinstance(collection, PantherCollection)
         assert collection.collection_name == collection_name
-        assert collection.content == {}
-        assert collection.secret_key is None
+        assert collection.db.content == {}
+        assert collection.db.secret_key is None
 
     # Drop
     def test_drop_collection(self):
         collection = self.db.collection(f.word())
         collection.drop()
-        assert collection.content == {}
+        assert collection.db.content == {}
 
     # Insert
     def test_insert_one(self):
@@ -645,7 +645,7 @@ class TestNormalPantherDB(TestCase):
         # Find
         obj = collection.find_one(first_name=first_name, last_name=last_name)
 
-        assert set(obj.data.keys()) == {'first_name', 'last_name', '_id'}
+        assert set(obj._data.keys()) == {'first_name', 'last_name', '_id'}
 
     # Save
     def test_document_save_method(self):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from threading import Thread
-from typing import ClassVar, Iterator, Any, List, Tuple, Union
+from threading import Thread, RLock
+from typing import ClassVar, Iterator, List, Tuple, Union, Callable
 
 import orjson as json
 import ulid
@@ -15,12 +15,8 @@ class PantherDBException(Exception):
 
 class PantherDB:
     _instances: ClassVar[dict] = {}
+    _instances_lock: ClassVar[RLock] = RLock()
     db_name: str = 'database.pdb'
-    __secret_key: bytes | None
-    __fernet: Any  # type: cryptography.fernet.Fernet | None
-    __return_dict: bool
-    __return_cursor: bool
-    __content: dict
 
     def __new__(cls, *args, **kwargs):
         if cls.__name__ != 'PantherDB':
@@ -34,39 +30,35 @@ class PantherDB:
             db_name = cls.db_name
 
         db_name = str(db_name)  # Can be PosixPath
-        # Replace with .removesuffix('.pdb') after python3.8 compatible support
-        if db_name.endswith('.pdb'):
-            db_name = db_name[:-4]
-        elif db_name.endswith('.json'):
-            db_name = db_name[:-5]
-
-        if db_name not in cls._instances:
-            cls._instances[db_name] = super().__new__(cls)
-        return cls._instances[db_name]
+        with cls._instances_lock:
+            if db_name not in cls._instances:
+                cls._instances[db_name] = super().__new__(cls)
+            return cls._instances[db_name]
 
     def __init__(
             self,
             db_name: str | None = None,
-            *,
             return_dict: bool = False,
             return_cursor: bool = False,
             secret_key: bytes | None = None,
     ):
-        self.__return_dict = return_dict
-        self.__return_cursor = return_cursor
-        self.__secret_key = secret_key
-        self.__content = {}
-        if self.__secret_key:
+        self.return_dict = return_dict
+        self.return_cursor = return_cursor
+        self.secret_key = secret_key
+        self.content = {}
+        self.lock = RLock()
+
+        if self.secret_key:
             from cryptography.fernet import Fernet
 
-            self.__fernet = Fernet(self.__secret_key)
+            self.fernet = Fernet(self.secret_key)
         else:
-            self.__fernet = None
+            self.fernet = None
 
         if db_name:
             db_name = str(db_name)  # Can be PosixPath
             if not db_name.endswith(('.pdb', '.json')):
-                if self.__secret_key:
+                if self.secret_key:
                     db_name = f'{db_name}.pdb'
                 else:
                     db_name = f'{db_name}.json'
@@ -74,380 +66,319 @@ class PantherDB:
         Path(self.db_name).touch(exist_ok=True)
 
     def __str__(self) -> str:
-        self._refresh()
-        db = ',\n'.join(f'    {k}: {len(v)} documents' for k, v in self.content.items())
-        return f'{self.__class__.__name__}(\n{db}\n)'
+        with self.lock:
+            self.refresh()
+            # TODO: Refactor this
+            db = ',\n'.join(f'    {k}: {len(v)} documents' for k, v in self.content.items())
+            return f'{self.__class__.__name__}(\n{db}\n)'
 
     __repr__ = __str__
 
-    @property
-    def content(self) -> dict:
-        return self.__content
-
-    @property
-    def return_cursor(self) -> bool:
-        return self.__return_cursor
-
-    @property
-    def return_dict(self) -> bool:
-        return self.__return_dict
-
-    @property
-    def secret_key(self) -> bytes | None:
-        return self.__secret_key
-
-    def _write(self) -> None:
+    def write(self) -> None:
         content = json.dumps(self.content)
 
         if self.secret_key:
-            content = self.__fernet.encrypt(content)
+            content = self.fernet.encrypt(content)
 
-        with open(self.db_name, 'bw') as file:
+        with open(self.db_name, 'wb') as file:
             file.write(content)
 
-    def _refresh(self) -> None:
+    def refresh(self) -> None:
         with open(self.db_name, 'rb') as file:
             data = file.read()
 
         if not data:
-            self.__content = {}
+            self.content = {}
 
-        elif not self.secret_key:
-            self.__content = json.loads(data)
+        elif self.fernet:
+            try:
+                decrypted_data: bytes = self.fernet.decrypt(data)
+            except Exception:  # type: type[cryptography.fernet.InvalidToken]
+                error = '`secret_key` Is Not Valid'
+                raise PantherDBException(error)
+
+            self.content = json.loads(decrypted_data)
 
         else:
             try:
-                decrypted_data: bytes = self.__fernet.decrypt(data)
-            except Exception:  # type: type[cryptography.fernet.InvalidToken]
-                error = '"secret_key" Is Not Valid'
-                raise PantherDBException(error)
-
-            self.__content = json.loads(decrypted_data)
+                self.content = json.loads(data)
+            except Exception as e:
+                print(f'{e=}\n\n')
+                print(f'{data=}')
 
     def collection(self, collection_name: str) -> PantherCollection:
-        return PantherCollection(
-            db_name=self.db_name,
-            collection_name=collection_name,
-            return_dict=self.return_dict,
-            return_cursor=self.return_cursor,
-            secret_key=self.secret_key,
-        )
+        return PantherCollection(collection_name=collection_name, db=self)
 
     def close(self):
         pass
 
 
-class PantherCollection(PantherDB):
-    __collection_name: str
-
-    def __init__(
-            self,
-            db_name: str,
-            *,
-            collection_name: str,
-            return_dict: bool,
-            return_cursor: bool,
-            secret_key: bytes,
-    ):
-        super().__init__(db_name=db_name, return_dict=return_dict, return_cursor=return_cursor, secret_key=secret_key)
-        self.__collection_name = collection_name
+class PantherCollection:
+    def __init__(self, collection_name: str, db: PantherDB):
+        self.collection_name = collection_name
+        self.db = db
+        self.documents: list = []
 
     def __str__(self) -> str:
-        self._refresh()
+        with self.db.lock:
+            self.db.refresh()
 
-        if self.collection_name not in self.content or (documents := self.content[self.collection_name]):
-            result = ''
-        else:
-            result = '\n'.join(f'    {k}: {type(v).__name__}' for k, v in documents[0].items())
+            # TODO: Refactor this
+            if self.collection_name not in self.db.content or (documents := self.db.content[self.collection_name]):
+                result = ''
+            else:
+                result = '\n'.join(f'    {k}: {type(v).__name__}' for k, v in documents[0].items())
 
-        return f'{self.__class__.__name__}(\n    collection_name: {self.collection_name}\n\n{result}\n)'
+            return f'{self.__class__.__name__}(\n    collection_name: {self.collection_name}\n\n{result}\n)'
 
-    @property
-    def collection_name(self) -> str:
-        return self.__collection_name
-
-    def __check_is_panther_document(self) -> None:
-        if not hasattr(self, '_id'):
-            raise PantherDBException('You should call this method on PantherDocument instance.')
-
-    def __create_result(self, data: dict, /) -> PantherDocument | dict:
-        if self.return_dict:
+    def _create_result(self, data: dict, /) -> PantherDocument | dict:
+        if self.db.return_dict:
             return data
 
-        return PantherDocument(
-            db_name=self.db_name,
-            collection_name=self.collection_name,
-            return_dict=self.return_dict,
-            return_cursor=self.return_cursor,
-            secret_key=self.secret_key,
-            **data,
-        )
+        return PantherDocument(collection=self, **data)
 
-    def _write_collection(self, documents: list) -> None:
-        self.content[self.collection_name] = documents
-        self._write()
-
-    def _drop_collection(self) -> None:
-        self._refresh()
-        if self.collection_name in self.content:
-            del self.content[self.collection_name]
-        self._write()
-
-    def _get_collection(self) -> list[dict]:
-        """Return documents"""
-        self._refresh()
-        return self.content.get(self.collection_name, [])
-
-    def _find(self, _documents: list, /, **kwargs) -> Iterator[tuple[int, PantherDocument | dict]]:
+    def _find(self, **kwargs) -> Iterator[tuple[int, PantherDocument | dict]]:
         found = False
-        for index, document in enumerate(_documents):
+        for index, document in enumerate(self.documents):
             for k, v in kwargs.items():
                 if document.get(k) != v:
                     break
             else:
                 found = True
-                yield index, self.__create_result(document)
+                yield index, self._create_result(document)
 
         if not found:
             yield None, None
 
+    def _reload_documents(self):
+        self.db.refresh()
+        self.documents = self.db.content.get(self.collection_name, [])
+
+    def _write_documents(self) -> None:
+        self.db.content[self.collection_name] = self.documents
+        self.db.write()
+
     def find_one(self, **kwargs) -> PantherDocument | dict | None:
-        documents = self._get_collection()
+        with self.db.lock:
+            self._reload_documents()
 
-        # Empty Collection
-        if not documents:
-            return None
+            # Empty Collection
+            if not self.documents:
+                return None
 
-        if not kwargs:
-            return self.__create_result(documents[0])
+            if not kwargs:
+                return self._create_result(self.documents[0])
 
-        for _, d in self._find(documents, **kwargs):
-            # Return the first document
-            return d
+            for _, d in self._find(**kwargs):
+                # Return the first document
+                return d
 
     def find(self, **kwargs) -> Cursor | List[PantherDocument | dict]:
-        documents = self._get_collection()
+        with self.db.lock:
+            self._reload_documents()
 
-        result = [d for _, d in self._find(documents, **kwargs) if d is not None]
+            result = [d for _, d in self._find(**kwargs) if d is not None]
 
-        if self.return_cursor:
-            return Cursor(result, kwargs)
-        return result
-
-    def first(self, **kwargs) -> PantherDocument | dict | None:
-        return self.find_one(**kwargs)
-
-    def last(self, **kwargs) -> PantherDocument | dict | None:
-        documents = self._get_collection()
-        documents.reverse()
-
-        # Empty Collection
-        if not documents:
-            return None
-
-        if not kwargs:
-            return self.__create_result(documents[0])
-
-        for _, d in self._find(documents, **kwargs):
-            # Return the first one
-            return d
-
-    def insert_one(self, **kwargs) -> PantherDocument | dict:
-        documents = self._get_collection()
-        kwargs['_id'] = ulid.new()
-        documents.append(kwargs)
-        self._write_collection(documents)
-        return self.__create_result(kwargs)
-
-    def delete(self) -> None:
-        self.__check_is_panther_document()
-        documents = self._get_collection()
-        for d in documents:
-            if d.get('_id') == self._id:  # noqa: Unresolved References
-                documents.remove(d)
-                self._write_collection(documents)
-                break
-
-    def delete_one(self, **kwargs) -> bool:
-        documents = self._get_collection()
-
-        # Empty Collection
-        if not documents:
-            return False
-
-        if not kwargs:
-            return False
-
-        for i, _ in self._find(documents, **kwargs):
-            if i is None:
-                # Didn't find any match
-                return False
-
-            # Delete matched one and return
-            documents.pop(i)
-            self._write_collection(documents)
-            return True
-
-    def delete_many(self, **kwargs) -> int:
-        documents = self._get_collection()
-
-        # Empty Collection
-        if not documents:
-            return 0
-
-        if not kwargs:
-            return 0
-
-        indexes = [i for i, _ in self._find(documents, **kwargs) if i is not None]
-
-        # Delete Matched Indexes
-        for i in indexes[::-1]:
-            documents.pop(i)
-        self._write_collection(documents)
-        return len(indexes)
-
-    def update(self, **kwargs) -> None:
-        self.__check_is_panther_document()
-        documents = self._get_collection()
-        kwargs.pop('_id', None)
-
-        for d in documents:
-            if d.get('_id') == self._id:  # noqa: Unresolved References
-                for k, v in kwargs.items():
-                    d[k] = v
-                    setattr(self, k, v)
-                self._write_collection(documents)
-
-    def update_one(self, condition: dict, **kwargs) -> bool:
-        documents = self._get_collection()
-        result = False
-
-        if not condition:
+            if self.db.return_cursor:
+                return Cursor(result, kwargs)
             return result
 
-        kwargs.pop('_id', None)
-        for d in documents:
-            for k, v in condition.items():
-                if d.get(k) != v:
-                    break
-            else:
-                result = True
-                for new_k, new_v in kwargs.items():
-                    d[new_k] = new_v
-                self._write_collection(documents)
-                break
+    def first(self, **filters) -> PantherDocument | dict | None:
+        with self.db.lock:
+            return self.find_one(**filters)
 
-        return result
+    def last(self, **kwargs) -> PantherDocument | dict | None:
+        with self.db.lock:
+            self._reload_documents()
+            self.documents.reverse()
+
+            # Empty Collection
+            if not self.documents:
+                return None
+
+            if not kwargs:
+                return self._create_result(self.documents[0])
+
+            for _, d in self._find(**kwargs):
+                # Return the first one
+                return d
+
+    def insert_one(self, **kwargs) -> PantherDocument | dict:
+        with self.db.lock:
+            self._reload_documents()
+            kwargs['_id'] = ulid.new()
+            self.documents.append(kwargs)
+            self._write_documents()
+            return self._create_result(kwargs)
+
+    def delete_one(self, **kwargs) -> bool:
+        with self.db.lock:
+            self._reload_documents()
+
+            # Empty Collection
+            if not self.documents:
+                return False
+
+            if not kwargs:
+                return False
+
+            for i, _ in self._find(**kwargs):
+                if i is None:
+                    # Didn't find any match
+                    return False
+
+                # Delete matched one and return
+                self.documents.pop(i)
+                self._write_documents()
+                return True
+
+    def delete_many(self, **kwargs) -> int:
+        with self.db.lock:
+            self._reload_documents()
+
+            # Empty Collection
+            if not self.documents:
+                return 0
+
+            indexes = [i for i, _ in self._find(**kwargs) if i is not None]
+
+            # Delete Matched Indexes
+            for i in indexes[::-1]:
+                self.documents.pop(i)
+            self._write_documents()
+            return len(indexes)
+
+    def update_one(self, condition: dict, **kwargs) -> bool:
+        with self.db.lock:
+            self._reload_documents()
+            result = False
+
+            if not condition:
+                return result
+
+            kwargs.pop('_id', None)
+            for d in self.documents:
+                for k, v in condition.items():
+                    if d.get(k) != v:
+                        break
+                else:
+                    result = True
+                    for new_k, new_v in kwargs.items():
+                        d[new_k] = new_v
+                    self._write_documents()
+                    break
+
+            return result
 
     def update_many(self, condition: dict, **kwargs) -> int:
-        documents = self._get_collection()
-        if not condition:
-            return 0
+        with self.db.lock:
+            self._reload_documents()
+            if not condition:
+                return 0
 
-        kwargs.pop('_id', None)
-        updated_count = 0
-        for d in documents:
-            for k, v in condition.items():
-                if d.get(k) != v:
-                    break
-            else:
-                updated_count += 1
-                for new_k, new_v in kwargs.items():
-                    d[new_k] = new_v
+            kwargs.pop('_id', None)
+            updated_count = 0
+            for d in self.documents:
+                for k, v in condition.items():
+                    if d.get(k) != v:
+                        break
+                else:
+                    updated_count += 1
+                    for new_k, new_v in kwargs.items():
+                        d[new_k] = new_v
 
-        if updated_count:
-            self._write_collection(documents)
-        return updated_count
+            if updated_count:
+                self._write_documents()
+            return updated_count
 
     def count(self, **kwargs) -> int:
-        documents = self._get_collection()
-        if not kwargs:
-            return len(documents)
+        with self.db.lock:
+            self._reload_documents()
+            if not kwargs:
+                return len(self.documents)
 
-        return len([i for i, _ in self._find(documents, **kwargs) if i is not None])
+            return len([i for i, _ in self._find(**kwargs) if i is not None])
 
     def drop(self) -> None:
-        self._drop_collection()
+        with self.db.lock:
+            self.db.refresh()
+            if self.collection_name in self.db.content:
+                del self.db.content[self.collection_name]
+            self.db.write()
 
 
-class PantherDocument(PantherCollection):
-    __data: dict
-
-    def __init__(
-            self,
-            db_name: str,
-            *,
-            collection_name: str,
-            return_dict: bool,
-            return_cursor: bool,
-            secret_key: bytes,
-            **kwargs,
-    ):
-        self.__data = kwargs
-        super().__init__(
-            db_name=db_name,
-            collection_name=collection_name,
-            return_dict=return_dict,
-            return_cursor=return_cursor,
-            secret_key=secret_key,
-        )
+class PantherDocument:
+    def __init__(self, collection: PantherCollection, **kwargs):
+        self._collection = collection
+        self._data = kwargs
 
     def __str__(self) -> str:
-        items = ', '.join(f'{k}={v}' for k, v in self.data.items())
-        return f'{self.collection_name}({items})'
+        items = ', '.join(f'{k}={v}' for k, v in self._data.items())
+        return f'{self._collection.collection_name}({items})'
 
     __repr__ = __str__
 
     def __getattr__(self, item: str):
         try:
-            return object.__getattribute__(self, '_PantherDocument__data')[item]
+            return self._data[item]
         except KeyError:
             error = f'Invalid Collection Field: "{item}"'
             raise PantherDBException(error)
 
+    __getitem__ = __getattr__
+
     def __setattr__(self, key, value):
-        if key not in [
-            '_PantherDB__return_dict',
-            '_PantherDB__return_cursor',
-            '_PantherDB__secret_key',
-            '_PantherDB__content',
-            '_PantherDB__fernet',
-            '_PantherDB__ulid',
-            '_PantherCollection__collection_name',
-            '_PantherDocument__data',
-        ]:
+        if key not in ['_collection', '_data']:
             try:
                 object.__getattribute__(self, key)
             except AttributeError:
-                self.data[key] = value
+                self._data[key] = value
                 return
 
         super().__setattr__(key, value)
 
     __setitem__ = __setattr__
 
-    __getitem__ = __getattr__
-
     @property
     def id(self) -> int:
-        return self.data['_id']
-
-    @property
-    def data(self) -> dict:
-        return self.__data
+        return self._data['_id']
 
     def save(self) -> None:
         """Pop & Insert New Document"""
-        documents = self._get_collection()
-        for i, d in enumerate(documents):
-            if d['_id'] == self.id:
-                documents.pop(i)
-                documents.insert(i, self.data)
-                break
-        self._write_collection(documents)
+        with self._collection.db.lock:
+            self._collection._reload_documents()
+            for i, d in enumerate(self._collection.documents):
+
+                if d['_id'] == self.id:
+                    self._collection.documents.pop(i)
+                    self._collection.documents.insert(i, self._data)
+                    break
+            self._collection._write_documents()
+
+    def update(self, **kwargs) -> None:
+        with self._collection.db.lock:
+            self._collection._reload_documents()
+            kwargs.pop('_id', None)
+
+            for d in self._collection.documents:
+                if d.get('_id') == self.id:
+                    for k, v in kwargs.items():
+                        d[k] = v
+                        setattr(self, k, v)
+                    break
+            self._collection._write_documents()
+
+    def delete(self) -> None:
+        with self._collection.db.lock:
+            self._collection._reload_documents()
+            for d in self._collection.documents:
+                if d.get('_id') == self.id:
+                    self._collection.documents.remove(d)
+                    self._collection._write_documents()
+                    break
 
     def json(self) -> str:
-        return json.dumps(self.data).decode()
+        return json.dumps(self._data).decode()
 
 
 class Cursor:
@@ -558,11 +489,11 @@ class Cursor:
                 result.append(new_loop.run_until_complete(coroutine))
             finally:
                 new_loop.close()
+
         thread = Thread(target=run_in_thread)
         thread.start()
         thread.join()
         return result[0]
-
 
     @classmethod
     def is_function_async(cls, func: Callable) -> bool:
